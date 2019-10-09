@@ -21,11 +21,14 @@
 source /etc/profile.d/modules.sh        # load the modules system of the LRZ
 
 module load python/3.6_intel            # load the module intelpython.
-# you can check out all available modules (e.g. python/2.7_intel if you use python2) 
-#with the command `module avail` in the command line
+# you can check out all available modules (e.g. python/2.7_intel if you use python2)
+# with the command `module avail` in the command line
 
 export MKL_NUM_THREADS=64               # number of cores per node, total for all the tasks below!
 export MKL_DYNAMIC=FALSE                # important: use hyperthreading and not just the number of physical cores.
+
+# if needed, you can set PYTHONPATH here to include other libraries, e.g.
+# export PYTHONPATH="$HOME/MyLibrary"
 
 echo "Execute  job on host $HOSTNAME at $(date)"
 NUMBER_TASKS=16                         # how many task do you want to submit on this node?

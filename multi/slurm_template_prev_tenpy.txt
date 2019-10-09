@@ -21,7 +21,7 @@
 
 source /etc/profile.d/modules.sh        # load the modules system of the LRZ
 
-module load python/3.6_intel            # load the module intelpython.
+module load python/2.7_intel            # load the module intelpython.
 # you can check out all available modules (e.g. python/2.7_intel if you use python2)
 # with the command `module avail` in the command line
 
@@ -29,7 +29,7 @@ export MKL_NUM_THREADS=64               # number of cores per node, total for al
 export MKL_DYNAMIC=FALSE                # important: use hyperthreading and not just the number of physical cores.
 
 # if needed, you can set PYTHONPATH here to include other libraries, e.g.
-TENPYPATH="/dss/dssfs02/lwp-dss-0001/pn69yo/pn69yo-dss-0000/shared/tenpy_20191009_master_for_python_3.6_intel"
+TENPYPATH="/dss/dssfs02/lwp-dss-0001/pn69yo/pn69yo-dss-0000/shared/prev_tenpy_20191009_master_for_python_2.7_intel"
 test -d "$TENPYPATH" || ( echo "can't find $TENPYPATH" && exit 1)
 export PYTHONPATH="$TENPYPATH"
 

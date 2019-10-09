@@ -13,7 +13,7 @@ export MKL_NUM_THREADS={Nslots:d}
 
 # if needed, you can set PYTHONPATH here to include other libraries, e.g.
 TENPYPATH="/home/t30/pol/shared/cluster/tenpy_20190923_v0.4.1"
-test -d "$TENPYPATH" || ( echo "can't find $TENPYPATH" && false )
+test -d "$TENPYPATH" || ( echo "can't find $TENPYPATH" && exit 1 )
 export PYTHONPATH="$TENPYPATH"
 
 echo "Execute job on host $HOSTNAME at $(date)"
