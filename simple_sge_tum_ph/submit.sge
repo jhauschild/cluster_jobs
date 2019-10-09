@@ -1,0 +1,21 @@
+#!/bin/bash
+#$ -S /bin/bash
+#$ -cwd
+# hardware requirements:
+#$ -l h_vmem=3G,h_cpu=0:59:00,h_fsize=2G
+
+# if you want to get notified by email, remove the first `# ` from the following lines (such that they start with `#$ -...`)
+# #$ -M max.mustermann@tum.de  # put your email address here!
+# #$ -m a  # n="NO_MAIL", a="MAIL_AT_ABORT", e="MAIL_AT_EXIT", combination `-m ae` is allowed
+
+#$ -pe smp 4
+#$ -R y
+#$ -q cond-mat
+
+export PATH="/mount/packs/intelpython35/bin:$PATH"
+export MKL_DYNAMIC=FALSE
+export MKL_NUM_THREADS=4   # This should be the *same* number as in the line ``#$ -pe smp ...`` above
+
+echo "Execute  job on host $HOSTNAME at $(date)"
+python simulation.py
+echo "finished job at $(date)"

@@ -1,0 +1,31 @@
+#!/bin/bash
+#$ -S /bin/bash
+#$ -cwd
+# hardware requirements:
+#$ -l h_vmem={mem!s},h_cpu={cpu!s},h_fsize={filesize!s}
+{more_options!s}
+
+set -e   # abort whole script if any command fails
+
+export PATH="/mount/packs/intelpython35/bin:$PATH"
+export MKL_DYNAMIC=FALSE
+export MKL_NUM_THREADS={Nslots:d}
+
+CWD=$(pwd)  # remember directory where we started -> where the output will be
+
+# compile a library
+TMPDIR=/scratch/$USER/$JOB_ID.$SGE_TASK_ID/MyLibrary
+cp -r $HOME/MyLibrary $TMPDIR
+export PYTHONPATH="$TMPDIR"
+cd $TMPDIR
+bash compile.sh  # or whatever is needed to compile the library
+
+cd $CWD  # go back to directory where the output shoud be
+echo "Execute job on host $HOSTNAME at $(date)"
+echo "in folder $(pwd)"
+echo "python {sim_file!s} {config_file!s} {job_id!s}"
+python {sim_file!s} {config_file!s} {job_id!s}
+echo "finished job at $(date)"
+
+# clean up the library
+rm -rf $TMPDIR
