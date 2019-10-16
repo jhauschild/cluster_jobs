@@ -214,6 +214,7 @@ import subprocess
 import sys
 import os
 import re
+import warnings
 
 __all__ = ['submit_sge', 'submit_slurm', 'run_local', 'run_simulation_commandline',
            'get_filenames_config_jobscript', 'read_textfile', 'create_sge_script',
@@ -234,6 +235,7 @@ def submit_sge(config, sge_template_filename='sge_template.txt'):
         Filename for the template of the *.sge script.
         We look for this file in the folder of `config['sim_file']`.
     """
+    check_config(config)
     config_filename, jobscript_filename = get_filenames_config_jobscript(
         config, "{jobname!s}.config.pkl", "{jobname!s}.sge")
     write_config_file(config_filename, config)
@@ -260,6 +262,7 @@ def submit_slurm(config, slurm_template_filename='slurm_template.txt'):
         Filename for the template of the jobscript.
         We look for this file in the folder of `config['sim_file']`.
     """
+    check_config(config)
     config_filename, jobscript_filename = get_filenames_config_jobscript(
         config, "{jobname!s}.config.pkl", "{jobname!s}.sh")
     write_config_file(config_filename, config)
@@ -284,6 +287,7 @@ def run_local(config, sge_template_filename='sge_template.txt'):
         If not None, create and execute an sge script  `submit_sge` does
         We look for this file in the folder of `config['sim_file']`.
     """
+    check_config(config)
     config_filename, jobscript_filename = get_filenames_config_jobscript(
         config, "{jobname!s}.config.pkl", "{jobname!s}.sge")
     write_config_file(config_filename, config)
@@ -307,6 +311,38 @@ def run_local(config, sge_template_filename='sge_template.txt'):
             print("Error while running $> " + ' '.join(cmd))
             sys.exit(1)
     # done
+
+
+def check_config(config):
+    """Check that the config has the expected form of a dictionary with expected keys.
+
+    Parameters
+    ----------
+    config : dict
+        Job configuration. See module doc-string for details.
+
+    Raises
+    ------
+    UserWarning : if the config contains unexpected keys, suggesting typos.
+    ValueError : if something else is wrong with the config.
+    """
+    config_keys = ['jobname', 'sim_file', 'sim_fct', 'params', 'require', 'email', 'mail_on_exit']
+    requ_keys = ['Nslots', 'cpu', 'mem', 'filesize', 'queue']
+    for key in config:
+        if key not in config_keys:
+            warnings.warn("unexpected key (typo?) in `config`: {0!r}".format(key))
+    for key in config['require']:
+        if key not in requ_keys:
+            warnings.warn("unexpected key (typo?) in `config['require']`: {0!r}".format(key))
+    for key in config_keys[:-2]:
+        if key not in config:
+            raise ValueError("missing required key {0!r} in `config`".format(key))
+    if 'email' in config:
+        email = str(config['email'])
+        if not re.match("[^@]+@[^@]+\.[^@]+", email):
+            raise ValueError("email '{}' doesn't look like an email".format(email))
+    if len(config['params']) == 0:
+        raise ValueError("Empty parameters")
 
 
 def run_simulation_commandline(module_functions):
@@ -367,20 +403,20 @@ def get_filenames_config_jobscript(config, conf_fn, jobscript_fn):
 
 
 def read_textfile(config, filename='sge_template.txt'):
-    """Read a text file, e.g., the template for the job script.
+    """Read a text file from the same folder as `config['sim_file']`.
 
     Parameters
     ----------
     config : dict
         Job configuration. See module doc-string for details.
     template_filename : str
-        Filename for the template of the jobscript.
+        Filename of the file to be read, e.g., for the template of the jobscript.
         We look for this file in the folder of `config['sim_file']`.
 
     Returns
     -------
     jobscript_template : str
-        Template for the jobscript.
+        Content of the file, e.g., the template for the jobscript.
     """
     sim_file_dir = os.path.dirname(os.path.abspath(config['sim_file']))
     filename = os.path.join(sim_file_dir, filename)
@@ -466,8 +502,6 @@ def create_sge_script(jobscript_filename, sge_template, config_filename, config)
         more_options += "#$ -q " + str(replacements['queue']) + "\n"
     if 'email' in config:
         email = str(config['email'])
-        if not re.match("[^@]+@[^@]+\.[^@]+", email):
-            raise ValueError("email '{}' doesn't look like an email".format(email))
         replacements['email'] = email
         more_options += "#$ -M " + email + "\n"
         mail_option = 'ae' if config.get('mail_on_exit', False) else 'a'
@@ -597,9 +631,7 @@ def create_slurm_script(jobscript_filename,
         replacements.setdefault('task_stops', " ".join(task_stops))
 
     if 'email' in config:
-        email = config.get('email')
-        if not re.match("[^@]+@[^@]+\.[^@]+", email):
-            raise ValueError("email {0!r} doesn't look like an email".format(email))
+        email = config['email']
         replacements['email'] = config['email']
         replacements['mailtype'] = "FAIL"
         if config.get('mail_on_exit', False):
