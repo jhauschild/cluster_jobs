@@ -12,7 +12,7 @@
 #$ -R y
 #$ -q cond-mat
 
-export PATH="/mount/packs/intelpython35/bin:$PATH"
+export PATH="/mount/packs/intelpython36/bin:$PATH"
 export MKL_DYNAMIC=FALSE
 export MKL_NUM_THREADS=4   # This should be the *same* number as in the line ``#$ -pe smp ...`` above
 

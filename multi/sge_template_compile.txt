@@ -7,7 +7,7 @@
 
 set -e   # abort whole script if any command fails
 
-export PATH="/mount/packs/intelpython35/bin:$PATH"
+export PATH="/mount/packs/intelpython36/bin:$PATH"
 export MKL_DYNAMIC=FALSE
 export MKL_NUM_THREADS={Nslots:d}
 

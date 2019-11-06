@@ -7,12 +7,12 @@
 
 set -e   # abort whole script if any command fails
 
-export PATH="/mount/packs/intelpython35/bin:$PATH"
+export PATH="/mount/packs/intelpython36/bin:$PATH"
 export MKL_DYNAMIC=FALSE
 export MKL_NUM_THREADS={Nslots:d}
 
 # if needed, you can set PYTHONPATH here to include other libraries, e.g.
-TENPYPATH="/home/t30/pol/shared/cluster/tenpy_20190923_v0.4.1"
+TENPYPATH="/home/t30/pol/shared/cluster/tenpy_20191009_master"
 test -d "$TENPYPATH" || ( echo "can't find $TENPYPATH" && exit 1 )
 export PYTHONPATH="$TENPYPATH"
 
