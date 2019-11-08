@@ -12,7 +12,7 @@ export MKL_DYNAMIC=FALSE
 export MKL_NUM_THREADS={Nslots:d}
 
 # if needed, you can set PYTHONPATH here to include other libraries, e.g.
-TENPYPATH="/home/t30/pol/shared/cluster/prev_tenpy_20180619"
+TENPYPATH="/space/cmt/tenpy_cluster/prev_tenpy_20180619"
 test -d "$TENPYPATH" || ( echo "can't find $TENPYPATH" && exit 1 )
 export PYTHONPATH="$TENPYPATH"
 
