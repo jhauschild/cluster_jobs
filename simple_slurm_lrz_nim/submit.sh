@@ -18,7 +18,7 @@
 #SBATCH --time=2-23:50:00               # enter a maximum runtime for the job. (format: days-hours:minutes:seconds)
 #                                         Maximum runtime on nim cluster: 3-00:00:00  (``scontrol show partition --clusters=kcs_nim``)
 
-source /etc/profile.d/modules.sh        # load the modules system of the LRZ
+module load slurm_setup                 # load the modules system of the LRZ
 
 module load python/3.6_intel            # load the module intelpython.
 # you can check out all available modules (e.g. python/2.7_intel if you use python2)
