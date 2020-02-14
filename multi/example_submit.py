@@ -1,6 +1,6 @@
-"""Example how to create a `config` for a job array and submit it using jobs_tum.py."""
+"""Example how to create a `config` for a job array and submit it using cluster_jobs.py."""
 
-import jobs_tum
+import cluster_jobs
 import os
 
 config = {
@@ -22,6 +22,6 @@ for a in [100, 500, 1000]:
         kwargs['output_filename'] = 'result_a_{a:d}_b_{b:.2f}.pkl'.format(a=a, b=b)
         config['params'].append(kwargs.copy())
 
-jobs_tum.submit_sge(config)    # our linux cluster at TUM Physics department
-#  jobs_tum.submit_slurm(config)  # NIM cluster at LRZ
-#  jobs_tum.run_local(config)     # alternative to run the simulation directly
+cluster_jobs.submit_sge(config)    # our linux cluster at TUM Physics department
+#  cluster_jobs.submit_slurm(config)  # NIM cluster at LRZ
+#  cluster_jobs.run_local(config)     # alternative to run the simulation directly

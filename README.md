@@ -5,7 +5,7 @@ The folder 'simple_slurm_lrz_nim/' contains a simple working example how to run 
 Further explanations can be found in our group wiki at https://wiki.tum.de/display/tuphtfk/Cluster+utilisation 
 (password protected, since it gives details about our cluster...).
 
-The 'multi/' folder contains the file `jobs_tum.py` to simplify submission of many (similar) simulations using Python. 
-Explanations are in the module doc string of `jobs_tum.py`. 
+The 'multi/' folder contains the file `cluster_jobs.py` to simplify submission of many (similar) simulations using Python. 
+Explanations are in the module doc string of `cluster_jobs.py`. 
 It provides the functions `submit_sge(...)` for SGE, `submit_slurm(...)` for SLURM, 
 as well as `run_local(...)` for debugging on a local machine.

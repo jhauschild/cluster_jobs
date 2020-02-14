@@ -13,12 +13,12 @@ LIMITATION: if there are still some jobs running on the cluster to produce the o
 """
 
 import sys
-import jobs_tum
+import cluster_jobs
 
 if len(sys.argv) < 2:
     raise ValueError("Expect arguments: CONFIG_FILENAME [RESUBMIT_TASK_ID ...]")
 config_filename = sys.argv[1]
-config = jobs_tum.read_config_file(config_filename)
+config = cluster_jobs.read_config_file(config_filename)
 # here, you can update hardware requirements
 #  config['require'].update(cpu='24:00:00')  # e.g. increase allowed runtime
 
@@ -28,7 +28,7 @@ if not '_rerun' in config['jobname']:
 
 if len(sys.argv) == 2:
     # find files where the output is missing
-    missing = jobs_tum.output_missing(config)
+    missing = cluster_jobs.output_missing(config)
     if len(missing) == 0:
         print("No output file missing")
         exit(1)
@@ -45,4 +45,4 @@ assert all([i > 0 for i in resubmit_ids])  # SGE_TASK_IDs start counting with 1,
 # filter config['params']  to include only the simulations for the desired jobd ids
 config['params'] = [config['params'][i-1] for i in resubmit_ids]
 
-jobs_tum.submit_sge(config)
+cluster_jobs.submit_sge(config)

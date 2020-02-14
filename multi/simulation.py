@@ -49,5 +49,5 @@ def another_simulation(output_filename, a, b):
 
 
 if __name__ == "__main__":
-    import jobs_tum
-    jobs_tum.run_simulation_commandline(globals())
+    import cluster_jobs
+    cluster_jobs.run_simulation_commandline(globals())

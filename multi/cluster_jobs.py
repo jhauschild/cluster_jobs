@@ -99,8 +99,8 @@ This can conveniently done using the function :func:`run_simulation_commandline`
 simply copy & paste the following lines at the end of `simulation.py`::
 
     if __name__ == "__main__":
-        import jobs_tum
-        jobs_tum.run_simulation_commandline(globals())
+        import cluster_jobs
+        cluster_jobs.run_simulation_commandline(globals())
 
 In addition, each job executed on the cluster writes stderr and stdout (i.e. what you
 `print(...)` in the simulation) to the files '{jobname}.sge.e####.#'
@@ -115,11 +115,11 @@ First of all: don't write simulation data to $HOME, as it has a 5GB quota limit!
 With the setup of this module, the python scripts for the simulation do not have to be in the
 same folder as your output data: we use relative paths for the output files
 (i.e., we specify only the filename, not the full path including folders).
-Therefore, you can keep the python codes (example_submit.py, jobs_tum.py, simulation.py,
+Therefore, you can keep the python codes (example_submit.py, cluster_jobs.py, simulation.py,
 sge_template.txt) in your $HOME directory, say in ~/jobs_example::
 
     ga12abc@homer:~/jobs_example> ls
-    example_resubmit.py  example_submit.py  jobs_tum.py  sge_template.txt  simulation.py
+    example_resubmit.py  example_submit.py  cluster_jobs.py  sge_template.txt  simulation.py
 
 You can then create another folder to store your data, say /space/$USER/jobs_example::
 
