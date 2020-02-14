@@ -206,6 +206,8 @@ so you have quite some computational power with a single node. Make sure that yo
 
 
 """
+# Copyright 2019-2020 jhauschild, MIT License
+# I maintain this file at https://github.com/jhauschild/cluster_jobs
 
 from __future__ import print_function  # (for compatibility with python 2)
 
