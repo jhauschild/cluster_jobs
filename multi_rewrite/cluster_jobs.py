@@ -1,4 +1,7 @@
-r"""Tools to submit multiple jobs to the cluster.
+#!/usr/bin/env python
+"""Tools to submit multiple jobs to the cluster.
+
+
 """
 # Copyright 2019-2020 jhauschild, MIT License
 # I maintain this file at https://github.com/jhauschild/cluster_jobs
@@ -7,12 +10,14 @@ from __future__ import print_function  # (for compatibility with python 2)
 
 import pickle
 import subprocess
-import sys
 import os
-import re
 import warnings
 import importlib
 
+try:
+    from pprint import pprint
+except:
+    pprint = print
 
 
 # TODO: include saving & collecting the data?!?
@@ -27,15 +32,19 @@ class Task:
 
 class CommandCall(Task):
     """Call a Command with given arguments."""
-    def __init__(self, comm):
-        self.filename = filename
+    def __init__(self, command):
+        self.command = command
 
     def run(self, parameters):
-        cmd = ['bash', self.filename] + parameters
+        cmd = [self.command] + parameters
+        # TODO: escape parameters
         print("call", cmd)
         res = subprocess.call(cmd)
         if res > 0:
             raise ValueError("Error while running command " + ' '.join(cmd))
+
+    def __repr__(self):
+        return "CommandCall({0!s})".format(self.command)
 
 
 class PythonFunctionCall(Task):
@@ -51,33 +60,37 @@ class PythonFunctionCall(Task):
             fct = getattr(fct, subpath)
         fct(**parameters)
 
+    def __repr__(self):
+        return "PythonFunctionCall({0!s}, {1!s})".format(self.module, self.function)
+
 
 class TaskArray:
-    """A series of tasks to be run."""
+    """The same task to be run multiple times with different parameters."""
 
-    TASK_TYPES = {
-        'Dummy': Task,
+    task_types = {
+        'Task': Task,
         'CommandCall': CommandCall,
         'PythonFunctionCall': PythonFunctionCall
     }
 
-    def __init__(self, task, task_parameters, **kwargs):
+    def __init__(self, task, task_parameters, verbose=False, **kwargs):
         if isinstance(task, dict):
             task_args = task.copy()
             type_ = task_args.pop('type')
-            TaskClass = self.TASK_TYPES[type_]
+            TaskClass = self.task_types[type_]
             task = TaskClass(**task_args)
         self.task = task
         self.task_parameters = task_parameters
+        self.verbose = verbose
 
     @property
-    def len(self):
+    def N_tasks(self):
         return len(self.task_parameters)
 
     def run_local(self, task_ids=None, parallel=False):
         """Run the tasks for the specified task_ids locally."""
         if task_ids is None:
-            task_ids = range(self.len)
+            task_ids = range(self.N_tasks)
         if parallel:
             raise NotImplementedError("TODO")
         for taks_id in task_ids:
@@ -87,7 +100,7 @@ class TaskArray:
         parameters = self.task_parameters[task_id]
         self.task.run(parameters)
 
-    def missing_output(config, key='output_filename'):
+    def missing_output(self, key='output_filename'):
         """Return task ids for which there is no output file."""
         result = []
         for i, parameters in enumerate(self.task_parameters):
@@ -97,37 +110,45 @@ class TaskArray:
         return result
 
 
-class ScheduledTaskArray(TaskArray):
+class JobConfig(TaskArray):
 
-    script_templates_directory = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                                              "templates")
+    source_dir = os.path.dirname(os.path.abspath(__file__))
+    script_templates_dir = os.path.join(source_dir, "templates")
 
     def __init__(self,
-                 jobname,
-                 script_template="bash.sh",
+                 jobname="MyJob",
+                 requirements={},
+                 options={},
+                 script_template="run.sh",
                  config_filename_template="{jobname}.config.pkl",
-                 script_filename_template="{jobname}_run.sh",
+                 script_filename_template="{jobname}.run.sh",
                  **kwargs):
         self.jobname = jobname
+        self.requirements = requirements
+        self.options = options
         self.script_template = script_template
+        self.config_filename_template = config_filename_template
+        self.script_filename_template = script_filename_template
         super().__init__(**kwargs)
 
-    @classmethod
-    def from_config(cls, config):
-        self = cls(**config)
-        return self
+    def submit(self):
+        """Submit the task tasks for the specified task_ids locally."""
+        self.options['task_id'] = "$TASK_ID"
+        script_file = self.prepare_submit()
+        for task_id in range(self.N_tasks):
+            os.environ['TASK_ID'] = str(task_id)
+            cmd = ['/usr/bin/env', 'bash', script_file]
+            res = subprocess.call(cmd)
+            if res > 0:
+                raise ValueError("Error while running command " + ' '.join(cmd))
+        # done
 
-    @classmethod
-    def from_config_file(cls, filename):
-        config = read_config_file(filename)
-        return cls.from_config(config)
-
-    def write_config_file(self, filename):
-        """Write the config to file `filename`."""
-        if self.len == 0:
-            raise ValueError("No task parameters scheduled")
-        config = self.__dict__
-        write_config_file(filename, config)
+    def prepare_submit(self):
+        config_file, script_file = self.unique_filenames()
+        self.write_config_file(config_file)
+        self.update_requirements()
+        self.create_script(script_file, config_file)
+        return script_file
 
     def unique_filenames(self):
         """Find a unique filenames for the config and the script by adjusting the `jobname`."""
@@ -143,100 +164,74 @@ class ScheduledTaskArray(TaskArray):
         self.jobname = jobname
         return formated_filenames
 
+    def write_config_file(self, filename):
+        """Write the config to file `filename`."""
+        if self.N_tasks == 0:
+            raise ValueError("No task parameters scheduled")
+        if filename.endswith('.pkl'):
+            with open(filename, 'wb') as f:
+                pickle.dump(self, f, protocol=2)  # use protocol 2 to still support Python 2
+        else:
+            raise ValueError("Don't recognise filetype of config filename " + repr(filename))
 
-    def check_config(config):
-        """Check that the config has the expected form of a dictionary with expected keys.
-
-        Parameters
-        ----------
-        config : dict
-            Job configuration. See module doc-string for details.
-
-        Raises
-        ------
-        UserWarning : if the config contains unexpected keys, suggesting typos.
-        ValueError : if something else is wrong with the config.
-        """
-        config_keys = ['jobname', 'sim_file', 'sim_fct', 'params', 'require', 'email', 'mail_on_exit']
-        requ_keys = ['Nslots', 'cpu', 'mem', 'filesize', 'queue']
-        for key in config:
-            if key not in config_keys:
-                warnings.warn("unexpected key (typo?) in `config`: {0!r}".format(key))
-        for key in config['require']:
-            if key not in requ_keys:
-                warnings.warn("unexpected key (typo?) in `config['require']`: {0!r}".format(key))
-        for key in config_keys[:-2]:
-            if key not in config:
-                raise ValueError("missing required key {0!r} in `config`".format(key))
-        if 'email' in config:
-            email = str(config['email'])
-            if not re.match("[^@]+@[^@]+\.[^@]+", email):
-                raise ValueError("email '{}' doesn't look like an email".format(email))
-        if len(config['params']) == 0:
-            raise ValueError("Empty parameters")
-
-    def run_local(self, task_ids=None, parallel=False):
-        """Run the tasks for the specified task_ids locally."""
-        config_fn, script_fn = self.unique_filenames()
-
-        write_config_file(config_filename, config)
-        if sge_template_filename is not None:
-            # create sge script like submit_sge()
-            sge_template = read_textfile(config, sge_template_filename)
-            create_sge_script(jobscript_filename, sge_template, config_filename, config)
-
-        # run jobs
-        for job_id in range(1, len(config['params']) + 1):  # (start counting at 1)
-            if sge_template_filename is not None:
-                os.environ['SGE_TASK_ID'] = str(job_id)
-                cmd = ['/usr/bin/env', 'bash', jobscript_filename]
-            else:
-                cmd = ['python', config['sim_file'], config_filename, str(job_id)]
-            print("=" * 80)
-            print("running $> ", ' '.join(cmd))
-            print("=" * 80)
-            res = subprocess.call(cmd)
-            if res > 0:
-                print("Error while running $> " + ' '.join(cmd))
-                sys.exit(1)
-        # done
-
-    def read_script_template(self, filename):
-        directory = self.script_template_directory
-        filename = os.path.join(directory, filename)
+    def read_script_template(self):
+        filename = os.path.join(self.script_templates_dir, self.script_template)
         with open(filename, 'r') as f:
             text = f.read()
         return text
 
+    def update_requirements(self):
+        self.options['task_id'] = "$TASK_ID"
 
-class SGEJobArray(ScheduledTaskArray):
+    def create_script(self, script_file, config_file):
+        script = self.read_script_template()
+        o = self.options
+        o.update()
+        o['config_file'] = config_file
+        o.setdefault('cluster_jobs_py', __file__)
+        o.setdefault('N_tasks', self.N_tasks)
+        requirements = []
+        for key, value in self.requirements.items():
+            requirements.append(self.get_requirements_line(key, value))
+            key = key.replace('-', '_').replace(' ', '_')  # try to convert to identifier
+            o[key] = value
+        o['requirements'] = '\n'.join(requirements).format_map(o)
+        script = script.format_map(o)  # similar as script.format(**o), but allow general dict `o`
+        with open(script_file, 'w') as f:
+            f.write(script)
 
-    def submit(config, sge_template_filename='sge_template.txt'):
-        """Submit a job (array) to the SGE
+    def get_requirements_line(self, key, value):
+        return "#REQUIRE {key}={value}".format(key=key, value=value)
 
-        The SGE (Sun Grid Engine) is the program managing the cluster at the physics department of
-        TU Munich.
 
-        Parameters
-        ----------
-        config : dict
-            Job configuration. See module doc-string for details.
-        sge_template_filename : str
-            Filename for the template of the *.sge script.
-            We look for this file in the folder of `config['sim_file']`.
-        """
-        check_config(config)
-        config_filename, jobscript_filename = get_filenames_config_jobscript(
-            config, "{jobname!s}.config.pkl", "{jobname!s}.sge")
-        write_config_file(config_filename, config)
-        sge_template = read_textfile(config, sge_template_filename)
-        create_sge_script(jobscript_filename, sge_template, config_filename, config)
-        cmd_submit = ['qsub', jobscript_filename]
+class SGEJob(JobConfig):
+    requirements_escape = "#$ -"
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault('script_template', "sge.sh")
+        kwargs.setdefault('script_filename_template', "{jobname}.sge.sh")
+        super().__init__(**kwargs)
+
+    def submit(self):
+        script_file = self.prepare_submit()
+        cmd_submit = ['qsub', script_file]
         print(' '.join(cmd_submit))
-        try:  # submit the job
-            subprocess.call(cmd_submit)
-        except OSError as e:
-            raise OSError("Failed to submit the job. Are you on a submit host?") from e
+        subprocess.call(cmd_submit)
+
+    def update_requirements(self):
+        o = self.options
+        r = self.requirements
+        if self.N_tasks > 1:
+            o['task_id'] = 0
+        else:
+            r.setdefault('t', '1-{N_tasks:d}')
+            o['task_id'] = "$(expr $SGE_TASK_ID - 1)"
+        if o.setdefault("cores_per_task", 4) > 1:
+            r.setdefault('pe smp', "{cores_per_task:d}")
+            r.setdefault('R', "y")
+
+    def get_requirements_line(self, key, value):
+        return "#$ -{key} {value}".format(key=key, value=value)
 
     def create_sge_script(jobscript_filename, sge_template, config_filename, config):
         """Create a submission script for the Sun Grid Engine(SGE).
@@ -290,35 +285,14 @@ class SGEJobArray(ScheduledTaskArray):
                             **config['require'])
         N_tasks = len(config['params'])
         # set default replacements
-        replacements.setdefault('cpu', '0:55:00')
-        replacements.setdefault('mem', '2G')
+        replacements.setdefault('time', '0:55:00')
+        replacements.setdefault('memory', '2G')
         replacements.setdefault('filesize', '4G')
         replacements.setdefault('Nslots', 4)
         cpu_seconds = time_str_to_seconds(replacements['cpu'])
         replacements.setdefault('cpu_seconds', cpu_seconds)
         more_options = replacements.get('more_options', "")
 
-        # adjust SGE script options
-        if replacements['Nslots'] > 1:
-            # specify for parallel environment, give the number of threads/cpus
-            more_options += "#$ -pe smp {Nslots:d}\n#$ -R y\n".format(**replacements)
-        if N_tasks > 1:
-            # use a job-array with different $SGE_TASK_ID
-            more_options += "#$ -t 1-{N_tasks:d}\n".format(N_tasks=N_tasks)
-            replacements.setdefault('job_id', "$SGE_TASK_ID")
-        elif N_tasks < 1:
-            raise ValueError("Got no parameters in job config!")
-        else:
-            replacements.setdefault('job_id', "1")
-        if 'queue' in replacements:
-            more_options += "#$ -q " + str(replacements['queue']) + "\n"
-        if 'email' in config:
-            email = str(config['email'])
-            replacements['email'] = email
-            more_options += "#$ -M " + email + "\n"
-            mail_option = 'ae' if config.get('mail_on_exit', False) else 'a'
-            more_options += "#$ -m {0} # a=MAIL_AT_ABORT, e=MAIL_AT_EXIT\n".format(mail_option)
-        replacements['more_options'] = more_options
 
         # format template
         sge_script = sge_template.format(**replacements)
@@ -327,86 +301,38 @@ class SGEJobArray(ScheduledTaskArray):
             f.write(sge_script)
 
 
-class SlurmJobArray(TaskArray):
-    def submit_slurm(config, slurm_template_filename='slurm_template.txt'):
-        """Submit a job (array) to SLURM.
+class SlurmJob(JobConfig):
+    def __init__(self, **kwargs):
+        kwargs.setdefault('script_template', "slurm.sh")
+        kwargs.setdefault('script_filename_template', "{jobname}.slurm.sh")
+        super().__init__(**kwargs)
 
-        SLURM is the cluster management of the LRZ in Munich.
-
-        Parameters
-        ----------
-        config : dict
-            Job configuration. See module doc-string for details.
-        slurm_template_filename : str
-            Filename for the template of the jobscript.
-            We look for this file in the folder of `config['sim_file']`.
-        """
-        check_config(config)
-        config_filename, jobscript_filename = get_filenames_config_jobscript(
-            config, "{jobname!s}.config.pkl", "{jobname!s}.sh")
-        write_config_file(config_filename, config)
-        slurm_template = read_textfile(config, slurm_template_filename)
-        create_slurm_script(jobscript_filename, slurm_template, config_filename, config)
-        cmd_submit = ['sbatch', jobscript_filename]
+    def submit(self):
+        script_file = self.prepare_submit()
+        cmd_submit = ['sbatch', script_file]
         print(' '.join(cmd_submit))
-        try:  # submit the job
-            subprocess.call(cmd_submit)
-        except OSError as e:
-            raise OSError("Failed to submit the job. Are you on a submit host?") from e
+        subprocess.call(cmd_submit)
+
+    def update_requirements(self):
+        o = self.options
+        r = self.requirements
+        if self.N_tasks > 1:
+            o['task_id'] = 0
+        else:
+            r.setdefault('task', '1-{N_tasks:d}')
+            o['task_id'] = "$(expr $SLURM_ARRAY_TASK_ID - 1)"
+        # if o.setdefault("cores_per_task", 4) > 1:
+
+
+    def get_requirements_line(self, key, value):
+        return "#SBATCH --{key}={value}".format(key=key, value=value)
 
     def create_slurm_script(jobscript_filename,
                             slurm_template,
                             config_filename,
                             config,
                             N_cores_per_node=64):
-        """Create a submission script for the Sun Grid Engine(SGE).
 
-        This function uses ``slurm_template.format(**replacements)`` to replace hardware
-        requirements and necessary filenames in the `slurm_template`,
-        and writes the formatted script to `jobscript_filename`.
-
-        The `slurm_template` can/should contain the following replacements:
-
-        ============= =====================================================================
-        name
-        ============= =====================================================================
-        cpu           Hardware requirements as specified in the module doc-string.
-        mem
-        Nslots
-        ------------- ---------------------------------------------------------------------
-        more_options  Used to insert additional/optional SGE options, e.g.
-                    for a job-array if more than one task is to be submitted.
-                    Should be somewhere at the beginning of the file
-                    (before actual bash commands).
-        ------------- ---------------------------------------------------------------------
-        sim_file      Filename of the simulation as defined in the `config`.
-        ------------- ---------------------------------------------------------------------
-        config_file   Filename of the `config`.
-        ------------- ---------------------------------------------------------------------
-        job_id        Defaults to '1' if just one node was requested; otherwise
-                    set to '$SLURM_ARRAY_TASK_ID' (starting to count at 1).
-        ------------- ---------------------------------------------------------------------
-        task_starts   Desired limits for the $TASKID variable in the `slurm_template`.
-        task_stops    Each of them is a string of whitespace separated integers,
-                    one integer for each `job_id`.
-        ============= =====================================================================
-
-
-        Parameters
-        ----------
-        jobscript_filename : str
-            Filename where to write the slurm script.
-        slurm_template : str
-            String to be formatted with the replacements.
-        config_filename : str
-            Filename where to the config can be found.
-        config : dict
-            Job configuration. See module doc-string for details.
-        N_cores_per_node : int
-            Number of cores per node. In our setup, the node is blocked completely by a single job,
-            having that number of cores available. Hence, we put an appropriate number of tasks in a
-            single job.
-        """
         replacements = dict(jobname=config['jobname'],
                             sim_file=config['sim_file'],
                             sim_fct=config['sim_fct'],
@@ -419,9 +345,6 @@ class SlurmJobArray(TaskArray):
         cpu_seconds = time_str_to_seconds(replacements['cpu'])
         replacements.setdefault('cpu_seconds', cpu_seconds)
         more_options = replacements.get('more_options', "")
-
-        if 'mem' in replacements:
-            more_options += "#SBATCH --mem-per-cpu={mem!s}\n".format(**replacements)
 
         if N_tasks < 1:
             raise ValueError("Got no parameters in job config!")
@@ -487,7 +410,6 @@ class SlurmJobArray(TaskArray):
             f.write(slurm_script)
 
 
-
 def read_config_file(filename):
     if filename.endswith('.pkl'):
         with open(filename, 'rb') as f:
@@ -498,46 +420,9 @@ def read_config_file(filename):
             config = yaml.save_load(f)
     else:
         raise ValueError("Don't recognise filetype of config file " + repr(filename))
-    if not isinstance(config, dict):
-        raise TypeError("expected config to be dict, got: " + str(type(config)))
+    if isinstance(config, dict):
+        config = JobConfig(**config)
     return config
-
-
-def write_config_file(filename, config):
-    if filename.endswith('.pkl'):
-        with open(filename, 'wb') as f:
-            pickle.dump(config, f, protocol=2)  # use protocol 2 if you need Python-2 support
-    else:
-        raise ValueError("Don't recognise filetype of config filename " + repr(filename))
-
-
-
-
-def run_simulation_commandline(module_functions):
-    """Run simulation specified by the command line arguments.
-
-    Expects the command line arguments `CONFIG_FILE` and `JOB_ID`.
-    Reads the config file to obtian the function name of the simluation and
-    keyword arguments of the specified job_id
-
-    Parameters
-    ----------
-    module_functions : dictionary
-        Dictionary containing the global functions of `sim_file` specified in the config.
-        Use ``globals()`` if you call this function from another script.
-    """
-    # parse command line arguments
-    try:
-        config_file, job_id = sys.argv[1:]
-        job_id = int(job_id)
-    except ValueError:
-        raise ValueError("Invalid command line arguments. Expected arguments: config_file job_id")
-    config = read_config_file(config_file)
-    sim_func = module_functions[config['sim_fct']]
-    kwargs = config['params'][job_id-1]
-    sim_func(**kwargs)
-
-
 
 
 def time_str_to_seconds(time):
@@ -547,14 +432,7 @@ def time_str_to_seconds(time):
     intervals = [1, 60, 60*60, 60*60*24]
     return sum(iv*int(t) for iv, t in zip(intervals, reversed(time.replace('-', ':').split(':'))))
 
-
-def main_run(args):
-    task_array = ScheduledTaskArray.from_config_file(args.configfile)
-    task_array.run_local(args.taskid, args.parallel)
-
-
-def main():
-    """Parse command line arguments and perform the specified task."""
+def parse_commandline_arguments():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", action="store_true", help="Print steps taken.")
@@ -563,22 +441,45 @@ def main():
     parser_run = subparsers.add_parser("run", help="run a given set of tasks",
                                        description="run one or multiple tasks")
     parser_run.add_argument("--parallel", action="store_true",
-                            help="if multiple tasks are given, run them in parallel.")
+                            help="Run tasks in parallel.")
     parser_run.add_argument("configfile",
-                            help="job configuration, e.g. 'my_jobname_02.config.pkl'")
+                            help="job configuration, e.g. 'myjob.config.pkl'")
     parser_run.add_argument("taskid", type=int, nargs="+", help="select the tasks to be run")
 
     parser_submit = subparsers.add_parser("submit", help="submit a task array to the cluster")
-    parser_submit.add_argument("jobconfig", nargs=1,
-                               help="job configuration, e.g. 'my_jobname_02.config.pkl'")
     parser_show = subparsers.add_parser("show", help="pretty-print the configuration")
+    parser_show.add_argument("-m", "--missing", choices=["files", "ids"], default=None,
+                               help="print the files or task ids of jobs where the output is missing.")
+    parser_show.add_argument("-k", "--key", default="output_filename",
+                               help="Parameter name giving the output file; default 'output_file'")
+    parser_show.add_argument("configfile",
+                             help="job configuration, e.g. 'myjob.config.pkl'")
     args = parser.parse_args()
-    if args.verbose:
-        print(args)  # TODO debug
+    return args
+
+
+def main(args):
     if args.command == "run":
-        main_run(args)
+        task_array = read_config_file(args.configfile)
+        task_array.run_local(args.taskid, args.parallel)
+    elif args.command == "show":
+        job = read_config_file(args.configfile)
+        if args.missing:
+            missing_ids = job.missing_output(args.key)
+            if args.missing == "files":
+                if args.verbose:
+                    print("The following output files have not been produced:")
+                for task_id in missing_ids:
+                    print(config['task_parameters'][task_id][args.key])
+            elif args.missing == "task_ids":
+                print(*missing_ids)
+        else:
+            pprint(config)
+    else:
+        raise ValueError("unknown command " + str(command))
 
 
 
 if __name__ == "__main__":
-    main()
+    args = parse_commandline_arguments()
+    main(args)
