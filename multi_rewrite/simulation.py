@@ -23,9 +23,12 @@ def run_simulation(**kwargs):
     # HERE is where you would usually run your simulation (e.g. DMRG).
     # simulate some heavy calculations:
     for i in range(3):
-        print("step ", i, flush=True)  # (remove `flush=True` for Python 2)
-        # the flush=True makes the output appear immediately
-        # time.sleep(1)
+        try:
+            print("step ", i, flush=True)  # (remove `flush=True` for Python 2)
+            # the flush=True makes the output appear immediately
+        except TypeError:  # flush is not available for Python 2
+            print("step ", i)
+        time.sleep(1)
 
     results = {'kwargs': kwargs, 'example_data': np.random.random((2, 2))}
 

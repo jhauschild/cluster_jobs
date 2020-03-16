@@ -6,12 +6,11 @@
 
 set -e  # abort whole script if any command fails
 
-export MKL_DYNAMIC=FALSE
-export MKL_NUM_THREADS={cores_per_task:d}
-
-# if needed, you can set PYTHONPATH here to include other libraries, e.g.
-# export PYTHONPATH="$HOME/MyLibrary"
+# === prepare the environement as necessary ===
+# module load python/3.7
+# conda activate tenpy
+{environment_setup}
 
 echo "Running task {task_id} of {config_file} on $HOSTNAME at $(date)"
-python {cluster_jobs_py} run {config_file} {task_id}
+python {cluster_jobs_module} run {config_file} {task_id} &> "{jobname}.task_{task_id}.out"
 echo "finished at $(date)"

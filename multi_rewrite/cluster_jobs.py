@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 """Tools to submit multiple jobs to the cluster.
 
-
 """
-# Copyright 2019-2020 jhauschild, MIT License
+# Copyright 2020 jhauschild, MIT License
 # I maintain this file at https://github.com/jhauschild/cluster_jobs
 
 from __future__ import print_function  # (for compatibility with python 2)
@@ -11,19 +10,19 @@ from __future__ import print_function  # (for compatibility with python 2)
 import pickle
 import subprocess
 import os
+import sys
 import warnings
 import importlib
-
+from pprint import pprint, PrettyPrinter
 try:
-    from pprint import pprint
-except:
-    pprint = print
+    from io import StringIO
+except ImportError:
+    from StringIO import StringIO  # python 2
 
 
 # TODO: include saving & collecting the data?!?
-class Task:
+class Task(object):
     """Abstract base class for a task ("simulation") to be run with a given set of parameters."""
-
     def run(self, parameters):
         """Run the task once for a given set of `parameters`."""
         print("This is an execution of a (dummy-)task with the following parameters:")
@@ -44,7 +43,7 @@ class CommandCall(Task):
             raise ValueError("Error while running command " + ' '.join(cmd))
 
     def __repr__(self):
-        return "CommandCall({0!s})".format(self.command)
+        return "CommandCall({0!r})".format(self.command)
 
 
 class PythonFunctionCall(Task):
@@ -61,11 +60,18 @@ class PythonFunctionCall(Task):
         fct(**parameters)
 
     def __repr__(self):
-        return "PythonFunctionCall({0!s}, {1!s})".format(self.module, self.function)
+        return "PythonFunctionCall({0!r}, {1!r})".format(self.module, self.function)
 
 
-class TaskArray:
-    """The same task to be run multiple times with different parameters."""
+class TaskArray(object):
+    """The same task to be run multiple times with different parameters.
+
+    We define the `task_id` to start from 1 instead of 0,
+    since cluster engines like SGE and SLURM support that better.
+    To avoid having to subtract/add 1 to the task_id each time, we just include a `None` entry
+    at the very beginning of `self.task_parameters`, such that
+    ``self.task_parameters[1]`` is the first defined set of parameters for `task_id` 1.
+    """
 
     task_types = {
         'Task': Task,
@@ -73,41 +79,82 @@ class TaskArray:
         'PythonFunctionCall': PythonFunctionCall
     }
 
-    def __init__(self, task, task_parameters, verbose=False, **kwargs):
+    def __init__(self,
+                 task,
+                 task_parameters,
+                 verbose=False,
+                 output_filename_keys=['output_filename'],
+                 **kwargs):
         if isinstance(task, dict):
             task_args = task.copy()
             type_ = task_args.pop('type')
             TaskClass = self.task_types[type_]
             task = TaskClass(**task_args)
         self.task = task
-        self.task_parameters = task_parameters
+        self.task_parameters = [None] + list(task_parameters)
         self.verbose = verbose
+        self.output_filename_keys = output_filename_keys
 
     @property
     def N_tasks(self):
-        return len(self.task_parameters)
+        return len(self.task_parameters) - 1
 
-    def run_local(self, task_ids=None, parallel=False):
+    @property
+    def task_ids(self):
+        return range(1, len(self.task_parameters))
+
+    def run_local(self, task_ids=None, parallel=1, only_missing=False):
         """Run the tasks for the specified task_ids locally."""
         if task_ids is None:
-            task_ids = range(self.N_tasks)
-        if parallel:
-            raise NotImplementedError("TODO")
-        for taks_id in task_ids:
-            self.run_task(taks_id)
+            task_ids = self.task_ids
+        if only_missing:
+            task_ids = [i for i in self.task_ids if self.is_missing_output(i)]
+        if parallel == 1:
+            for task_id in task_ids:
+                self.run_task(task_id)
+        elif parallel > 1:
+            from multiprocessing import Pool
+            pool = Pool(parallel)
+            pool.map(self.run_task, task_ids)
+        else:
+            raise ValueError("parallel={0!r} doesn't make sense!".format(parallel))
 
     def run_task(self, task_id):
+        if task_id == 0:
+            raise ValueError("`task_id` starts counting at 1!")
         parameters = self.task_parameters[task_id]
         self.task.run(parameters)
 
-    def missing_output(self, key='output_filename'):
-        """Return task ids for which there is no output file."""
+    def task_ids_missing_output(self, keys=None):
+        """Return task_ids for which there is no output file."""
+        if keys is None:
+            keys = self.output_filename_keys
         result = []
-        for i, parameters in enumerate(self.task_parameters):
+        for task_id in self.task_ids:
+            if task_id == 0:
+                continue
+            if self.is_missing_output(task_id, keys):
+                result.append(task_id)
+        return result
+
+    def is_missing_output(self, task_id, keys=None):
+        if keys is None:
+            keys = self.output_filename_keys
+        for key in keys:
+            parameters = self.task_parameters[task_id]
             output_filename = parameters[key]
             if not os.path.exists(output_filename):
-                result.append(i)
-        return result
+                return True
+        return False
+
+    def __repr__(self):
+        res = StringIO()
+        res.write(self.__class__.__name__ + "\n")
+        pp = PrettyPrinter(stream=res)
+        config = self.__dict__.copy()
+        del config['task_parameters']
+        pp.pprint(config)
+        return res.getvalue()[:-1]
 
 
 class JobConfig(TaskArray):
@@ -129,13 +176,13 @@ class JobConfig(TaskArray):
         self.script_template = script_template
         self.config_filename_template = config_filename_template
         self.script_filename_template = script_filename_template
-        super().__init__(**kwargs)
+        super(JobConfig, self).__init__(**kwargs)
 
     def submit(self):
         """Submit the task tasks for the specified task_ids locally."""
         self.options['task_id'] = "$TASK_ID"
         script_file = self.prepare_submit()
-        for task_id in range(self.N_tasks):
+        for task_id in self.task_ids:
             os.environ['TASK_ID'] = str(task_id)
             cmd = ['/usr/bin/env', 'bash', script_file]
             res = subprocess.call(cmd)
@@ -187,16 +234,18 @@ class JobConfig(TaskArray):
         script = self.read_script_template()
         o = self.options
         o.update()
+        o['jobname'] = self.jobname
         o['config_file'] = config_file
-        o.setdefault('cluster_jobs_py', __file__)
+        o.setdefault('cluster_jobs_module', __file__)
+        o.setdefault('environment_setup', "")
         o.setdefault('N_tasks', self.N_tasks)
-        requirements = []
+        requirements_lines = []
         for key, value in self.requirements.items():
-            requirements.append(self.get_requirements_line(key, value))
+            requirements_lines.append(self.get_requirements_line(key, value))
             key = key.replace('-', '_').replace(' ', '_')  # try to convert to identifier
             o[key] = value
-        o['requirements'] = '\n'.join(requirements).format_map(o)
-        script = script.format_map(o)  # similar as script.format(**o), but allow general dict `o`
+        o['requirements'] = '\n'.join(requirements_lines).format(**o)
+        script = script.format(**o)
         with open(script_file, 'w') as f:
             f.write(script)
 
@@ -207,10 +256,11 @@ class JobConfig(TaskArray):
 class SGEJob(JobConfig):
     requirements_escape = "#$ -"
 
-    def __init__(self, **kwargs):
+    def __init__(self, requirements_sge={}, **kwargs):
+        self.requirements_sge = requirements_sge
         kwargs.setdefault('script_template', "sge.sh")
         kwargs.setdefault('script_filename_template', "{jobname}.sge.sh")
-        super().__init__(**kwargs)
+        super(SGEJob, self).__init__(**kwargs)
 
     def submit(self):
         script_file = self.prepare_submit()
@@ -221,11 +271,12 @@ class SGEJob(JobConfig):
     def update_requirements(self):
         o = self.options
         r = self.requirements
-        if self.N_tasks > 1:
-            o['task_id'] = 0
+        r.update(self.requirements_sge)
+        if self.N_tasks == 1:
+            o['task_id'] = 1
         else:
             r.setdefault('t', '1-{N_tasks:d}')
-            o['task_id'] = "$(expr $SGE_TASK_ID - 1)"
+            o['task_id'] = "$SGE_TASK_ID"
         if o.setdefault("cores_per_task", 4) > 1:
             r.setdefault('pe smp', "{cores_per_task:d}")
             r.setdefault('R', "y")
@@ -233,79 +284,13 @@ class SGEJob(JobConfig):
     def get_requirements_line(self, key, value):
         return "#$ -{key} {value}".format(key=key, value=value)
 
-    def create_sge_script(jobscript_filename, sge_template, config_filename, config):
-        """Create a submission script for the Sun Grid Engine(SGE).
-
-        This function uses ``sge_template.format(**replacements)`` to replace hardware
-        requirements and necessary filenames in the `sge_template`,
-        and writes the formatted script to `jobscript_filename`.
-
-        The `sge_template` can/should contain the following replacements:
-
-        ============= =====================================================================
-        name
-        ============= =====================================================================
-        cpu           Hardware requirements as specified in the module doc-string.
-        mem
-        filesize
-        Nslots        If `Nslots` > 1, add the corresponding settings to `more_options`.
-        ------------- ---------------------------------------------------------------------
-        more_options  Used to insert additional/optional SGE options, e.g. for `queue`,
-                        if `Nslots` > 1 needs to be specified to the SGE, or
-                        for the optional line with the email.
-                        Should be somewhere at the beginning of the file
-                        (before actual bash commands).
-        ------------- ---------------------------------------------------------------------
-        sim_file      Filename of the simulation as defined in the `config`.
-        ------------- ---------------------------------------------------------------------
-        config_file   Filename of the `config`.
-        ------------- ---------------------------------------------------------------------
-        job_id        Set to '$SGE_TASK_ID' if ``len(config['params']) > 1``;
-                    otherwise defaults to '1'.
-        ------------- ---------------------------------------------------------------------
-        email         The user's email (if given).
-        ============= =====================================================================
-
-
-        Parameters
-        ----------
-        jobscript_filename : str
-            Filename where to write the sge script.
-        sge_template : str
-            String to be formatted with the replacements.
-        config_filename : str
-            Filename where to the config can be found.
-        config : dict
-            Job configuration. See module doc-string for details.
-        """
-        replacements = dict(jobname=config['jobname'],
-                            sim_file=config['sim_file'],
-                            sim_fct=config['sim_fct'],
-                            config_file=config_filename,
-                            **config['require'])
-        N_tasks = len(config['params'])
-        # set default replacements
-        replacements.setdefault('time', '0:55:00')
-        replacements.setdefault('memory', '2G')
-        replacements.setdefault('filesize', '4G')
-        replacements.setdefault('Nslots', 4)
-        cpu_seconds = time_str_to_seconds(replacements['cpu'])
-        replacements.setdefault('cpu_seconds', cpu_seconds)
-        more_options = replacements.get('more_options', "")
-
-
-        # format template
-        sge_script = sge_template.format(**replacements)
-        # write the script to file
-        with open(jobscript_filename, 'w') as f:
-            f.write(sge_script)
-
 
 class SlurmJob(JobConfig):
-    def __init__(self, **kwargs):
+    def __init__(self, requirements_slurm={}, **kwargs):
+        self.requirements_slurm = requirements_slurm
         kwargs.setdefault('script_template', "slurm.sh")
         kwargs.setdefault('script_filename_template', "{jobname}.slurm.sh")
-        super().__init__(**kwargs)
+        super(SlurmJob, self).__init__(**kwargs)
 
     def submit(self):
         script_file = self.prepare_submit()
@@ -316,13 +301,12 @@ class SlurmJob(JobConfig):
     def update_requirements(self):
         o = self.options
         r = self.requirements
-        if self.N_tasks > 1:
-            o['task_id'] = 0
+        r.update(self.requirements_slurm)
+        if self.N_tasks == 1:
+            o['task_id'] = 1
         else:
             r.setdefault('task', '1-{N_tasks:d}')
-            o['task_id'] = "$(expr $SLURM_ARRAY_TASK_ID - 1)"
-        # if o.setdefault("cores_per_task", 4) > 1:
-
+            o['task_id'] = "$SLURM_ARRAY_TASK_ID"
 
     def get_requirements_line(self, key, value):
         return "#SBATCH --{key}={value}".format(key=key, value=value)
@@ -351,7 +335,7 @@ class SlurmJob(JobConfig):
         if N_tasks == 1:
             if N_slots < N_cores_per_node:
                 print("WARNING: We're always blocking a full node with {cores:d} cores. "
-                    "Can your one task really use that?".format(cores=N_cores_per_node))
+                      "Can your one task really use that?".format(cores=N_cores_per_node))
             replacements.setdefault('job_id', "1")
             replacements.setdefault('task_starts', "1")
             replacements.setdefault('task_stops', "1")
@@ -363,13 +347,13 @@ class SlurmJob(JobConfig):
                     asked_N_cores % N_cores_per_node > N_cores_per_node / 2.:
                 N_nodes += 1
                 msg = ("Asking for {N_tasks:d} tasks of each {N_slots:d} cores, "
-                    "rounding up to {N_nodes:d} node(s).")
+                       "rounding up to {N_nodes:d} node(s).")
             elif asked_N_cores % N_cores_per_node == 0:
                 msg = ("Asking for {N_tasks:d} tasks of each {N_slots:d} cores, "
-                    "fitting into {N_nodes:d} node(s).")
+                       "fitting into {N_nodes:d} node(s).")
             else:
                 msg = ("Asking for {N_tasks:d} tasks of each {N_slots:d} cores, "
-                    "rounding down to {N_nodes:d} node(s).")
+                       "rounding down to {N_nodes:d} node(s).")
             print(msg.format(N_tasks=N_tasks, N_nodes=N_nodes, N_slots=N_slots))
 
             if N_nodes > 1:
@@ -426,34 +410,42 @@ def read_config_file(filename):
 
 
 def time_str_to_seconds(time):
-    """Convert a time intervall specified as a string ``dd:hh:mm:ss'`` into seconds.
+    """Convert a time intervall specified as a string like ``dd-hh:mm:ss'`` into seconds.
 
-    Accepts both '-' and ':' as separators."""
-    intervals = [1, 60, 60*60, 60*60*24]
-    return sum(iv*int(t) for iv, t in zip(intervals, reversed(time.replace('-', ':').split(':'))))
+    Accepts both '-' and ':' as separators at all positions."""
+    intervals = [1, 60, 60 * 60, 60 * 60 * 24]
+    return sum(
+        iv * int(t) for iv, t in zip(intervals, reversed(time.replace('-', ':').split(':'))))
+
 
 def parse_commandline_arguments():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", action="store_true", help="Print steps taken.")
+    parser.add_argument("-m",
+                        "--missing",
+                        action="store_true",
+                        help="only for task_ids where the output is missing")
     subparsers = parser.add_subparsers(dest="command")
-
-    parser_run = subparsers.add_parser("run", help="run a given set of tasks",
+    # run
+    parser_run = subparsers.add_parser("run",
+                                       help="run a given set of tasks",
                                        description="run one or multiple tasks")
-    parser_run.add_argument("--parallel", action="store_true",
-                            help="Run tasks in parallel.")
-    parser_run.add_argument("configfile",
-                            help="job configuration, e.g. 'myjob.config.pkl'")
-    parser_run.add_argument("taskid", type=int, nargs="+", help="select the tasks to be run")
-
+    parser_run.add_argument("--parallel",
+                            type=int,
+                            default=1,
+                            help="Run that many tasks in parallel.")
+    parser_run.add_argument("configfile", help="job configuration, e.g. 'myjob.config.pkl'")
+    parser_run.add_argument("task_id", type=int, nargs="+", help="select the tasks to be run")
+    # submit
     parser_submit = subparsers.add_parser("submit", help="submit a task array to the cluster")
+    parser_submit.add_argument("configfile",
+                               help="job configuration, e.g. 'myjob.config.pkl' "
+                               "or 'parameters.yml'")
+    # show
     parser_show = subparsers.add_parser("show", help="pretty-print the configuration")
-    parser_show.add_argument("-m", "--missing", choices=["files", "ids"], default=None,
-                               help="print the files or task ids of jobs where the output is missing.")
-    parser_show.add_argument("-k", "--key", default="output_filename",
-                               help="Parameter name giving the output file; default 'output_file'")
-    parser_show.add_argument("configfile",
-                             help="job configuration, e.g. 'myjob.config.pkl'")
+    parser_show.add_argument("what", choices=["parameters", "files", "task_ids", "config"])
+    parser_show.add_argument("configfile", help="job configuration, e.g. 'myjob.config.pkl'")
     args = parser.parse_args()
     return args
 
@@ -461,23 +453,40 @@ def parse_commandline_arguments():
 def main(args):
     if args.command == "run":
         task_array = read_config_file(args.configfile)
-        task_array.run_local(args.taskid, args.parallel)
+        task_array.run_local(args.task_id, args.parallel, args.missing)
     elif args.command == "show":
         job = read_config_file(args.configfile)
         if args.missing:
-            missing_ids = job.missing_output(args.key)
-            if args.missing == "files":
-                if args.verbose:
-                    print("The following output files have not been produced:")
-                for task_id in missing_ids:
-                    print(config['task_parameters'][task_id][args.key])
-            elif args.missing == "task_ids":
-                print(*missing_ids)
+            task_ids = job.task_ids_missing_output()
         else:
-            pprint(config)
+            task_ids = job.task_ids
+        if args.what == "files":
+            for task_id in task_ids:
+                for key in job.output_filename_keys:
+                    fn = job.task_parameters[task_id][key]
+                    if not os.path.exists(fn):
+                        print(fn)
+        elif args.what == "task_ids":
+            print(*task_ids)
+        elif args.what == "config":
+            print(job)
+        elif args.what == "parameters":
+            for task_id in task_ids:
+                print("-" * 20, "task_id", task_id)
+                pprint(job.task_parameters[task_id])
+        else:
+            raise ValueError("unknown choice of 'what'")
+    elif args.command == "submit":
+        job = read_config_file(args.configfile)
+        if args.missing:
+            task_ids = job.task_ids_missing_output()
+            if len(task_ids) == 0:
+                print("no output files missing")
+                return
+            job.task_parameters = [None] + [job.task_parameters[i] for i in task_ids]
+        job.submit()
     else:
         raise ValueError("unknown command " + str(command))
-
 
 
 if __name__ == "__main__":
