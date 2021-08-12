@@ -3,7 +3,7 @@
 
 """
 # Copyright 2020 jhauschild, MIT License
-# I maintain this file at https://github.com/jhauschild/cluster_jobs
+# I maintain this file at https://github.com/jhauschild/cluster_jobs in multi_rewrite/
 
 from __future__ import print_function  # (for compatibility with python 2)
 
@@ -37,13 +37,13 @@ class CommandCall(Task):
     def run(self, parameters):
         cmd = [self.command] + parameters
         # TODO: escape parameters
-        print("call", cmd)
+        print("call", ' '.join(cmd))
         res = subprocess.call(cmd)
         if res > 0:
             raise ValueError("Error while running command " + ' '.join(cmd))
 
     def __repr__(self):
-        return "CommandCall({0!r})".format(self.command)
+        return "CommandCall({0!r})".format(' '.join(self.command))
 
 
 class PythonFunctionCall(Task):
@@ -215,6 +215,7 @@ class JobConfig(TaskArray):
         """Write the config to file `filename`."""
         if self.N_tasks == 0:
             raise ValueError("No task parameters scheduled")
+        print("Write job config with {0:d} tasks to {1!r}".format(self.N_tasks, filename))
         if filename.endswith('.pkl'):
             with open(filename, 'wb') as f:
                 pickle.dump(self, f, protocol=2)  # use protocol 2 to still support Python 2
@@ -263,6 +264,8 @@ class SGEJob(JobConfig):
         super(SGEJob, self).__init__(**kwargs)
 
     def submit(self):
+        if self.N_tasks > 1000:
+            raise ValueError("Refuse to submit {0:d} tasks at once.".format(self.N_tasks))
         script_file = self.prepare_submit()
         cmd_submit = ['qsub', script_file]
         print(' '.join(cmd_submit))
@@ -293,6 +296,8 @@ class SlurmJob(JobConfig):
         super(SlurmJob, self).__init__(**kwargs)
 
     def submit(self):
+        if self.N_tasks > 1000:
+            raise ValueError("Refuse to submit {0:d} tasks at once.".format(self.N_tasks))
         script_file = self.prepare_submit()
         cmd_submit = ['sbatch', script_file]
         print(' '.join(cmd_submit))
@@ -305,7 +310,7 @@ class SlurmJob(JobConfig):
         if self.N_tasks == 1:
             o['task_id'] = 1
         else:
-            r.setdefault('task', '1-{N_tasks:d}')
+            r.setdefault('array', '1-{N_tasks:d}')
             o['task_id'] = "$SLURM_ARRAY_TASK_ID"
 
     def get_requirements_line(self, key, value):
@@ -418,6 +423,12 @@ def time_str_to_seconds(time):
         iv * int(t) for iv, t in zip(intervals, reversed(time.replace('-', ':').split(':'))))
 
 
+def get_recursive(parameters, recursive_key, split="/"):
+    for subkey in recursive_key.split(split):
+        parameters = parameters[subkey]
+    return parameters
+
+
 def parse_commandline_arguments():
     import argparse
     parser = argparse.ArgumentParser()
@@ -445,7 +456,11 @@ def parse_commandline_arguments():
     # show
     parser_show = subparsers.add_parser("show", help="pretty-print the configuration")
     parser_show.add_argument("what", choices=["parameters", "files", "task_ids", "config"])
+    parser_show.add_argument("-k", "--key", default=None,
+                             help="optionally select `key` for `parameters`")
     parser_show.add_argument("configfile", help="job configuration, e.g. 'myjob.config.pkl'")
+    parser_show.add_argument("task_id", type=int, nargs="*",
+                             help="task id(s) for which to show stuff; default: all or --missing")
     args = parser.parse_args()
     return args
 
@@ -456,10 +471,12 @@ def main(args):
         task_array.run_local(args.task_id, args.parallel, args.missing)
     elif args.command == "show":
         job = read_config_file(args.configfile)
-        if args.missing:
-            task_ids = job.task_ids_missing_output()
-        else:
+        task_ids = args.task_id
+        if len(task_ids) == 0:
             task_ids = job.task_ids
+        if args.missing:
+            missing = job.task_ids_missing_output()
+            task_ids = sorted(set(task_ids) & set(missing))
         if args.what == "files":
             for task_id in task_ids:
                 for key in job.output_filename_keys:
@@ -472,8 +489,14 @@ def main(args):
             print(job)
         elif args.what == "parameters":
             for task_id in task_ids:
-                print("-" * 20, "task_id", task_id)
-                pprint(job.task_parameters[task_id])
+                if len(task_ids) > 1:
+                    print("-" * 20, "task_id", task_id)
+                parameters = job.task_parameters[task_id]
+                if args.key is not None:
+                    entry = get_recursive(parameters, args.key)
+                    print(entry)
+                else:
+                    pprint(parameters)
         else:
             raise ValueError("unknown choice of 'what'")
     elif args.command == "submit":
