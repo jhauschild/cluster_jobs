@@ -1,11 +1,11 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Tools to submit multiple jobs to the cluster.
 
 """
-# Copyright 2020 jhauschild, MIT License
-# I maintain this file at https://github.com/jhauschild/cluster_jobs in multi_rewrite/
+# Copyright 2021 jhauschild, MIT License
+# I maintain this file at https://github.com/jhauschild/cluster_jobs in multi_yaml/
 
-from __future__ import print_function  # (for compatibility with python 2)
+# requires Python >= 3.5
 
 import pickle
 import subprocess
@@ -14,13 +14,20 @@ import sys
 import warnings
 import importlib
 from pprint import pprint, PrettyPrinter
-try:
-    from io import StringIO
-except ImportError:
-    from StringIO import StringIO  # python 2
+import itertools
+from collections.abc import Mapping
+from copy import deepcopy
+import sys
+
+from io import StringIO
+
+from cluster_jobs_tools import get_recursive, set_recursive, merge_recursive, expand_parameters
+
+# --------------------------------------
+# Classes for Tasks
+# --------------------------------------
 
 
-# TODO: include saving & collecting the data?!?
 class Task(object):
     """Abstract base class for a task ("simulation") to be run with a given set of parameters."""
     def run(self, parameters):
@@ -48,11 +55,16 @@ class CommandCall(Task):
 
 class PythonFunctionCall(Task):
     """Task calling a specific python function of a given module."""
-    def __init__(self, module, function):
+    def __init__(self, module, function, extra_imports=None):
         self.module = module
         self.function = function
+        self.extra_imports = extra_imports
 
     def run(self, parameters):
+        if self.extra_imports is not None:
+            for module in self.extra_imports:
+                print('import ', module)
+                importlib.import_module(module)
         mod = importlib.import_module(self.module)
         fct = mod
         for subpath in self.function.split('.'):
@@ -60,7 +72,9 @@ class PythonFunctionCall(Task):
         fct(**parameters)
 
     def __repr__(self):
-        return "PythonFunctionCall({0!r}, {1!r})".format(self.module, self.function)
+        return "PythonFunctionCall({0!r}, {1!r}, {2!r})".format(self.module,
+                                                                self.function,
+                                                                self.extra_imports)
 
 
 class TaskArray(object):
@@ -82,6 +96,7 @@ class TaskArray(object):
     def __init__(self,
                  task,
                  task_parameters,
+                 filter_task_ids=None,
                  verbose=False,
                  output_filename_keys=['output_filename'],
                  **kwargs):
@@ -92,6 +107,8 @@ class TaskArray(object):
             task = TaskClass(**task_args)
         self.task = task
         self.task_parameters = [None] + list(task_parameters)
+        if filter_task_ids is not None:
+            self.task_parameters = [None] + [self.task_parameters[i] for i in filter_task_ids]
         self.verbose = verbose
         self.output_filename_keys = output_filename_keys
 
@@ -156,6 +173,10 @@ class TaskArray(object):
         pp.pprint(config)
         return res.getvalue()[:-1]
 
+# --------------------------------------
+# Classes for cluster jobs
+# that setup scripts
+# --------------------------------------
 
 class JobConfig(TaskArray):
 
@@ -177,6 +198,20 @@ class JobConfig(TaskArray):
         self.config_filename_template = config_filename_template
         self.script_filename_template = script_filename_template
         super(JobConfig, self).__init__(**kwargs)
+
+    @classmethod
+    def expand_from_config(cls, **config):
+        job_config = config['job_config'].copy()
+        task_parameters = config.copy()
+        if job_config.get('remove_this_section', True):
+            del task_parameters['job_config']
+        task_parameters = expand_parameters(task_parameters,
+                                            **job_config.get('change_parameters', {}))
+        job_config['task_parameters'] = task_parameters
+        self = cls(**job_config)
+        self.expanded_from = config
+        self.config_filename_template = self.config_filename_template[:-3] + 'yml'
+        return self
 
     def submit(self):
         """Submit the task tasks for the specified task_ids locally."""
@@ -219,6 +254,10 @@ class JobConfig(TaskArray):
         if filename.endswith('.pkl'):
             with open(filename, 'wb') as f:
                 pickle.dump(self, f, protocol=2)  # use protocol 2 to still support Python 2
+        elif filename.endswith('.yml'):
+            import yaml
+            with open(filename, 'w') as f:
+                yaml.dump(self.expanded_from, f, sort_keys=False)
         else:
             raise ValueError("Don't recognise filetype of config filename " + repr(filename))
 
@@ -255,8 +294,6 @@ class JobConfig(TaskArray):
 
 
 class SGEJob(JobConfig):
-    requirements_escape = "#$ -"
-
     def __init__(self, requirements_sge={}, **kwargs):
         self.requirements_sge = requirements_sge
         kwargs.setdefault('script_template', "sge.sh")
@@ -316,101 +353,289 @@ class SlurmJob(JobConfig):
     def get_requirements_line(self, key, value):
         return "#SBATCH --{key}={value}".format(key=key, value=value)
 
-    def create_slurm_script(jobscript_filename,
-                            slurm_template,
-                            config_filename,
-                            config,
-                            N_cores_per_node=64):
 
-        replacements = dict(jobname=config['jobname'],
-                            sim_file=config['sim_file'],
-                            sim_fct=config['sim_fct'],
-                            config_file=config_filename,
-                            **config['require'])
-        N_tasks = len(config['params'])
-        # set default replacements
-        replacements.setdefault('cpu', '0:55:00')
-        N_slots = replacements.setdefault('Nslots', 4)
-        cpu_seconds = time_str_to_seconds(replacements['cpu'])
-        replacements.setdefault('cpu_seconds', cpu_seconds)
-        more_options = replacements.get('more_options', "")
+job_classes = {'TaskArray': TaskArray,
+               'JobConfig': JobConfig,
+               'SGEJob': SGEJob,
+               'SlurmJob': SlurmJob}
 
-        if N_tasks < 1:
-            raise ValueError("Got no parameters in job config!")
-        if N_tasks == 1:
-            if N_slots < N_cores_per_node:
-                print("WARNING: We're always blocking a full node with {cores:d} cores. "
-                      "Can your one task really use that?".format(cores=N_cores_per_node))
-            replacements.setdefault('job_id', "1")
-            replacements.setdefault('task_starts', "1")
-            replacements.setdefault('task_stops', "1")
-        else:
-            assert N_slots >= 1
-            asked_N_cores = N_slots * N_tasks
-            N_nodes = asked_N_cores // N_cores_per_node
-            if asked_N_cores < N_cores_per_node or \
-                    asked_N_cores % N_cores_per_node > N_cores_per_node / 2.:
-                N_nodes += 1
-                msg = ("Asking for {N_tasks:d} tasks of each {N_slots:d} cores, "
-                       "rounding up to {N_nodes:d} node(s).")
-            elif asked_N_cores % N_cores_per_node == 0:
-                msg = ("Asking for {N_tasks:d} tasks of each {N_slots:d} cores, "
-                       "fitting into {N_nodes:d} node(s).")
+
+# --------------------------------------
+# Function to parse command line args
+# --------------------------------------
+# get_recursive, set_recursive, and merge_recursive are as defined in `tenpy.tools.misc`;
+# but copy-pasted here to avoid import errors when TeNpy is not installed
+
+
+_UNSET = object()  # sentinel
+
+
+def get_recursive(nested_data, recursive_key, separator=".", default=_UNSET):
+    """Extract specific value from a nested data structure.
+
+    Parameters
+    ----------
+    nested_data : dict of dict (-like)
+        Some nested data structure supporting a dict-like interface.
+    recursive_key : str
+        The key(-parts) to be extracted, separated by `separator`.
+        A leading `separator` is ignored.
+    separator : str
+        Separator for splitting `recursive_key` into subkeys.
+    default :
+        If not specified, the function raises a `KeyError` if the recursive_key is invalid.
+        If given, return this value when any of the nested dicts does not contain the subkey.
+
+    Returns
+    -------
+    entry :
+        For example, ``recursive_key="some.sub.key"`` will result in extracing
+        ``nested_data["some"]["sub"]["key"]``.
+
+    See also
+    --------
+    set_recursive : same for changing/setting a value.
+    """
+    if recursive_key.startswith(separator):
+        recursive_key = recursive_key[len(separator):]
+    if not recursive_key:
+        return nested_data  # return the original data if recursive_key is just "/"
+    for subkey in recursive_key.split(separator):
+        if default is not _UNSET and subkey not in nested_data:
+            return default
+        nested_data = nested_data[subkey]
+    return nested_data
+
+
+def set_recursive(nested_data, recursive_key, value, separator=".", insert_dicts=False):
+    """Same as :func:`get_recursive`, but set the data entry to `value`."""
+    if recursive_key.startswith(separator):
+        recursive_key = recursive_key[len(separator):]
+    subkeys = recursive_key.split(separator)
+    for subkey in subkeys[:-1]:
+        if insert_dicts and subkey not in nested_data:
+            nested_data[subkey] = {}
+        nested_data = nested_data[subkey]
+    nested_data[subkeys[-1]] = value
+
+
+def update_recursive(nested_data, update_data, separator=".", insert_dicts=True):
+    """Wrapper around :func:`set_recursive` to allow updating multiple values at once.
+
+    It simply calls :func:`set_recursive` for each ``recursive_key, value in update_data.items()``.
+    """
+    for k, v in update_data.items():
+        set_recursive(nested_data, k, v, separator, insert_dicts)
+
+
+def merge_recursive(*nested_data, conflict='error', path=None):
+    """Merge nested dictionaries `nested1` and `nested2`.
+
+    Parameters
+    ----------
+    *nested_data: dict of dict
+        Nested dictionaries that should be merged.
+    path: list of str
+        Path inside the nesting for useful error message
+    conflict: "error" | "first" | "last"
+        How to handle conflicts: raise an error (if the values are different),
+        or just give priority to the first or last `nested_data` that still has a value,
+        even if they are different.
+
+    Returns
+    -------
+    merged: dict of dict
+        A single nested dictionary with the keys/values of the `nested_data` merged.
+        Dictionary values appearing in multiple of the `nested_data` get merged recursively.
+    """
+    if len(nested_data) == 0:
+        raise ValueError("need at least one nested_data")
+    elif len(nested_data) == 1:
+        return nested_data[0]
+    elif len(nested_data) > 2:
+        merged = nested_data[0]
+        for to_merge in nested_data[1:]:
+            merged = merge_recursive(merged, to_merge, conflict=conflict, path=path)
+        return merged
+    nested1, nested2 = nested_data
+    if path is None:
+        path = []
+    merged = nested1.copy()
+    for key, val2 in nested2.items():
+        if key in merged:
+            val1 = merged[key]
+            if isinstance(val1, Mapping) and isinstance(val2, Mapping):
+                merged[key] = merge_recursive(val1, val2,
+                                              conflict=conflict,
+                                              path=path + [repr(key)])
             else:
-                msg = ("Asking for {N_tasks:d} tasks of each {N_slots:d} cores, "
-                       "rounding down to {N_nodes:d} node(s).")
-            print(msg.format(N_tasks=N_tasks, N_nodes=N_nodes, N_slots=N_slots))
-
-            if N_nodes > 1:
-                more_options += "#SBATCH --array=1-{N_nodes:d}\n".format(N_nodes=N_nodes)
-                replacements.setdefault('job_id', "$SLURM_ARRAY_TASK_ID")
-            else:
-                replacements.setdefault('job_id', "1")
-
-            # distribute tasks over nodes
-            tasks_per_node = [0] * N_nodes  # how many tasks for each node?
-            for i in range(N_tasks):
-                tasks_per_node[i % N_nodes] += 1
-            task_starts = []
-            task_stops = []
-            start = 1
-            for node in range(N_nodes):
-                task_starts.append(str(start))
-                task_stops.append(str(start + tasks_per_node[node] - 1))
-                start += tasks_per_node[node]
-            replacements.setdefault('task_starts', ' '.join(task_starts))
-            replacements.setdefault('task_stops', " ".join(task_stops))
-
-        if 'email' in config:
-            email = config['email']
-            replacements['email'] = config['email']
-            replacements['mailtype'] = "FAIL"
-            if config.get('mail_on_exit', False):
-                replacements['mailtype'] = "FAIL,END"
+                if conflict == 'error':
+                    if val1 != val2:
+                        path = ':'.join(path + [repr(key)])
+                        msg = '\n'.join([f"Conflict with different values at {path}; we got:",
+                                         repr(val1), repr(val2)])
+                        raise ValueError(msg)
+                elif conflict == 'first':
+                    pass
+                elif conflict == 'last':
+                    merged[key] = val2
         else:
-            replacements['email'] = ""
-            replacements['mailtype'] = "NONE"
-        replacements['more_options'] = more_options
+            merged[key] = val2
+    return merged
 
-        # format template
-        slurm_script = slurm_template.format(**replacements)
-        # write the script to file
-        with open(jobscript_filename, 'w') as f:
-            f.write(slurm_script)
 
+def expand_parameters(nested, *,
+                      recursive_keys=None,
+                      value_lists=None,
+                      format_strs=None,
+                      expansion='product',
+                      output_filename=None,
+                      separator='.',
+                      ):
+    if recursive_keys is None:
+        return [deepcopy(nested)]
+    if value_lists is None:
+        value_lists = [get_recursive(nested, key, separator) for key in recursive_keys]
+    if output_filename is not None:
+        if 'key' in output_filename:
+            out_fn_key = output_filename['key']
+            del output_filename['key']
+        else:
+            out_fn_key = 'output_filename'
+        output_filename.setdefault('separator', separator)
+        parts = output_filename.setdefault('parts', {})
+        if format_strs is None:
+            format_strs = [rkey.split(separator)[-1] + '_{0!s}' for rkey in recursive_keys]
+        for key, fstr in zip(recursive_keys, format_strs):
+            parts[key] = fstr
+    expanded = []
+    if expansion == 'product':
+        iterator = itertools.product(*value_lists)
+    elif expansion == 'zip':
+        iterator = zip(*value_lists)
+    for vals in iterator:
+        new_nested = deepcopy(nested)
+        for key, value in zip(recursive_keys, vals):
+            set_recursive(new_nested, key, value, separator, True)
+        if output_filename is not None:
+            fn = output_filename_from_dict(new_nested, **output_filename)
+            set_recursive(new_nested, out_fn_key, fn, separator, True)
+        expanded.append(new_nested)
+    return expanded
+
+
+# note: this is the same as tenpy.simulations.simulation.output_filename_from_dict
+def output_filename_from_dict(options,
+                              parts={},
+                              prefix='result',
+                              suffix='.h5',
+                              joint='_',
+                              parts_order=None,
+                              separator='.'):
+    """Format a `output_filename` from parts with values from nested `options`.
+
+    The results of a simulation are ideally fixed by the simulation class and the `options`.
+    Unique filenames could be obtained by including *all* options into the filename, but this
+    would be a huge overkill: it suffices if we include the options that we actually change.
+    This function helps to keep the length of the output filename at a sane level
+    while ensuring (hopefully) sufficient uniqueness.
+
+    Parameters
+    ----------
+    options : (nested) dict
+        Typically the simulation parameters, i.e., options passed to :class:`Simulation`.
+    parts :: dict
+        Entries map a `recursive_key` for `options` to a `format_str` used
+        to format the value, i.e. we extend the filename with
+        ``format_str.format(get_recursive(options, recursive_key, separator))``.
+        If `format_str` is empty, no part is added to the filename.
+    prefix, suffix : str
+        First and last part of the filename.
+    joint : str
+        Individual filename parts (except the suffix) are joined by this string.
+    parts_order : None | list of keys
+        Optionally, an explicit order for the keys of `parts`.
+        By default (None), just the keys of `parts`, i.e. the order in which they appear in the
+        dictionary; before python 3.7 (where the order is not defined) alphabetically sorted.
+    separator : str
+        Separator for :func:`~tenpy.tools.misc.get_recursive`.
+
+    Returns
+    -------
+    output_filename : str
+        (Hopefully) sufficiently unique filename.
+
+    Examples
+    --------
+    >>> options = {  # some simulation parameters
+    ...    'algorithm_params': {
+    ...         'dt': 0.01,  # ...
+    ...    },
+    ...    'model_params':  {
+    ...         'Lx': 3,
+    ...         'Ly': 4, # ...
+    ...    }, # ... and many more options ...
+    ... }
+    >>> output_filename_from_dict(options)
+    'result.h5'
+    >>> output_filename_from_dict(options, suffix='.pkl')
+    'result.pkl'
+    >>> output_filename_from_dict(options, parts={'model_params.Ly': 'Ly_{0:d}'}, prefix='check')
+    'check_Ly_4.h5'
+    >>> output_filename_from_dict(options, parts={
+    ...         'algorithm_params.dt': 'dt_{0:.3f}',
+    ...         'model_params.Ly': 'Ly_{0:d}'})
+    'result_dt_0.010_Ly_4.h5'
+    >>> output_filename_from_dict(options, parts={
+    ...         'algorithm_params.dt': 'dt_{0:.3f}',
+    ...         ('model_params.Lx', 'model_params.Ly'): '{0:d}x{1:d}'})
+    'result_dt_0.010_3x4.h5'
+    >>> output_filename_from_dict(options, parts={
+    ...         'algorithm_params.dt': '_dt_{0:.3f}',
+    ...         'model_params.Lx': '_{0:d}',
+    ...         'model_params.Ly': 'x{0:d}'}, joint='')
+    'result_dt_0.010_3x4.h5'
+    """
+    formatted_parts = [prefix]
+    if parts_order is None:
+        if sys.version_info < (3, 7):
+            # dictionaries are not ordered -> sort keys alphabetically
+            parts_order = sorted(parts.keys(), key=lambda x: x[0] if isinstance(x, tuple) else x)
+        else:
+            parts_order = parts.keys()  # dictionaries are ordered, so use that order
+    else:
+        assert set(parts_order) == set(parts.keys())
+    for recursive_key in parts_order:
+        format_str = parts[recursive_key]
+        if not format_str:
+            continue
+        if not isinstance(recursive_key, tuple):
+            recursive_key = (recursive_key, )
+        vals = [get_recursive(options, r_key, separator) for r_key in recursive_key]
+        part = format_str.format(*vals)
+        formatted_parts.append(part)
+    return joint.join(formatted_parts) + suffix
+
+
+# --------------------------------------
+# Function to parse command line args
+# --------------------------------------
 
 def read_config_file(filename):
     if filename.endswith('.pkl'):
         with open(filename, 'rb') as f:
             config = pickle.load(f)
+        if isinstance(config, dict):
+            config = JobConfig(**config)
     elif filename.endswith('.yml'):
         import yaml
         with open(filename, 'r') as f:
-            config = yaml.save_load(f)
+            config = yaml.safe_load(f)
+        cls_name = config['job_config']['class']
+        cls = job_classes[cls_name]
+        config = cls.expand_from_config(**config)
     else:
         raise ValueError("Don't recognise filetype of config file " + repr(filename))
-    if isinstance(config, dict):
-        config = JobConfig(**config)
     return config
 
 
@@ -421,12 +646,6 @@ def time_str_to_seconds(time):
     intervals = [1, 60, 60 * 60, 60 * 60 * 24]
     return sum(
         iv * int(t) for iv, t in zip(intervals, reversed(time.replace('-', ':').split(':'))))
-
-
-def get_recursive(parameters, recursive_key, split="/"):
-    for subkey in recursive_key.split(split):
-        parameters = parameters[subkey]
-    return parameters
 
 
 def parse_commandline_arguments():
@@ -450,9 +669,16 @@ def parse_commandline_arguments():
     parser_run.add_argument("task_id", type=int, nargs="+", help="select the tasks to be run")
     # submit
     parser_submit = subparsers.add_parser("submit", help="submit a task array to the cluster")
-    parser_submit.add_argument("configfile",
-                               help="job configuration, e.g. 'myjob.config.pkl' "
-                               "or 'parameters.yml'")
+    parser_submit.add_argument('-c', '--conflict-merge',
+                               choices=['error', 'first', 'last'],
+                               default='error')
+    parser_submit.add_argument("yaml_parameter_file", nargs="+",
+                               help="One or multiple yaml files with the task parameters as a "
+                               "single dictionary. It should have a section `job_config` "
+                               "with keyword arguments for the corresponding "
+                               "JobConfig/SGEJob/SlurmJob class in `cluster_jobs.py`. "
+                               "The class itself is given under they key 'job_config':'class'. "
+                              )
     # show
     parser_show = subparsers.add_parser("show", help="pretty-print the configuration")
     parser_show.add_argument("what", choices=["parameters", "files", "task_ids", "config"])
@@ -500,13 +726,22 @@ def main(args):
         else:
             raise ValueError("unknown choice of 'what'")
     elif args.command == "submit":
-        job = read_config_file(args.configfile)
+        import yaml
+        yaml_configs = []
+        for fn in args.yaml_parameter_file:
+            with open(fn, 'r') as f:
+                yaml_configs.append(yaml.safe_load(f))
+        config = merge_recursive(*yaml_configs, conflict=args.conflict_merge)
+        cls_name = config['job_config']['class']
+        cls = job_classes[cls_name]
+        job = cls.expand_from_config(**config)
         if args.missing:
             task_ids = job.task_ids_missing_output()
             if len(task_ids) == 0:
                 print("no output files missing")
                 return
             job.task_parameters = [None] + [job.task_parameters[i] for i in task_ids]
+            job.expanded_from['job_config']['filter_task_ids'] = task_ids
         job.submit()
     else:
         raise ValueError("unknown command " + str(command))

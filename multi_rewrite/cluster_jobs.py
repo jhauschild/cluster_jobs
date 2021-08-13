@@ -234,7 +234,6 @@ class JobConfig(TaskArray):
     def create_script(self, script_file, config_file):
         script = self.read_script_template()
         o = self.options
-        o.update()
         o['jobname'] = self.jobname
         o['config_file'] = config_file
         o.setdefault('cluster_jobs_module', __file__)

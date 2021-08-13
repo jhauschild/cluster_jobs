@@ -17,11 +17,11 @@ config = {
         'nodes': 1,  # number of nodes
         # 'mail-user': "no@example.com",
     },
-    'requirements_sge': {  # for SGE
-        'l': 'h_cpu=0:30:00,h_vmem=4G',
-        'q': 'queue',
-        # 'M': "no@example.com"
-    },
+    #  'requirements_sge': {  # for SGE
+    #      'l': 'h_cpu=0:30:00,h_vmem=4G',
+    #      'q': 'queue',
+    #      # 'M': "no@example.com"
+    #  },
     'options': {  # further replacements for the job script; used to determine extra requirements
         # 'mail': 'no@example.com',
         'cores_per_task': 4,

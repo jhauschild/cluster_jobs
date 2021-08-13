@@ -1,0 +1,54 @@
+#!/bin/bash 
+
+job_config:
+    class: JobConfig
+    jobname: MyJob
+    task: 
+        type: PythonFunctionCall
+        module: simulation
+        function: run_simulation
+        # extra_imports: 
+        #     - my_other_py_module
+
+    #script_template: slurm.sh
+    requirements_slurm:
+        time: '0:30:00'
+        nodes: 1
+    # requirements_sge:
+    #     time: '0:30:00'
+    #     nodes: 1
+    # options: 
+    #     mail: no@example.com
+
+    # TODO: allow this
+    # change_output_filename:
+    #     key: output_filename
+    #     expand_join: '_'
+    #     format: "out_{expand!s}.pkl"
+    #
+    change_parameters:
+        expansion: product
+        recursive_keys:
+            - a
+            - sub_params.c
+        # value_lists: 
+        #     - [ 128, 256, 512]
+        #     - [0.5, 1.]
+        #     # you can either specify all the value_lists for all parameters here, 
+        #     # or have the lists distributed over the rest of the yaml file(s).
+        # format_strs:
+        #     - 'a_{0:04d}'
+        #     - 'c_{0:.2f}'
+         
+        output_filename:
+            # key: output_filename
+            prefix: 'output'
+            suffix: '.pkl'
+
+a: [100, 500, 1000]
+b: 3.1415
+
+sub_params:
+    c: [0.5, 1.]
+    d: 2
+
