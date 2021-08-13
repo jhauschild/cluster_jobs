@@ -181,7 +181,7 @@ class TaskArray(object):
 class JobConfig(TaskArray):
 
     source_dir = os.path.dirname(os.path.abspath(__file__))
-    script_templates_dir = os.path.join(source_dir, "templates")
+    script_templates_dir = os.path.join(source_dir, "cluster_templates")
 
     def __init__(self,
                  jobname="MyJob",
