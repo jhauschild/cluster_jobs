@@ -1,7 +1,7 @@
 #!/bin/bash 
 
 job_config:
-    class: JobConfig
+    class: JobConfig  # JobConfig = run locally; SlurmJob = submit to slurm
     jobname: MyJob
     task: 
         type: PythonFunctionCall
@@ -20,14 +20,8 @@ job_config:
     # options: 
     #     mail: no@example.com
 
-    # TODO: allow this
-    # change_output_filename:
-    #     key: output_filename
-    #     expand_join: '_'
-    #     format: "out_{expand!s}.pkl"
-    #
     change_parameters:
-        expansion: product
+        expansion: product  # product or zip
         recursive_keys:
             - a
             - sub_params.c
