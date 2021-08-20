@@ -41,7 +41,6 @@ class CommandCall(Task):
 
     def run(self, parameters):
         cmd = [self.command] + parameters
-        # TODO: escape parameters
         print("call", ' '.join(cmd))
         res = subprocess.call(cmd)
         if res > 0:
@@ -625,6 +624,44 @@ def output_filename_from_dict(options,
         formatted_parts.append(part)
     return joint.join(formatted_parts) + suffix
 
+# --------------------------------------
+# yaml with !py_eval "..."
+# --------------------------------------
+
+try:
+    import yaml
+except ImportError:
+    pass
+else: # no ImportError
+    class YamlLoaderWithPyEval(yaml.FullLoader):
+        pass
+
+    def yaml_eval_construcor(loader, node):
+        """yaml constructor to support `!py_eval "... (python eval code)..."` in yaml files."""
+        cmd = loader.construct_scalar(node)
+        if not isinstance(cmd, str):
+            raise ValueError("expect string argument to `!py_eval`")
+        glob = {}
+        if "np." in cmd:
+            import numpy as np
+            glob['np'] = np
+        try:
+            res = eval(cmd, glob)
+        except:
+            print("\nError while yaml parsing the following !py_eval command:\n", cmd, "\n")
+            raise
+        if isinstance(res, np.ndarray) and res.ndim == 1 and len(res) < 20:
+            # try to simplify to a list of python scalars
+            # such make a subsequent `yaml.dump()` much prettier
+            if res.dtype.kind == 'f':
+                res = [float(v) for v in res]
+            elif res.dtype.kind == 'i':
+                res = [int(v) for v in res]
+            else:
+                pass
+        return res
+
+    yaml.add_constructor("!py_eval", yaml_eval_construcor, Loader=YamlLoaderWithPyEval)
 
 # --------------------------------------
 # Function to parse command line args
@@ -639,7 +676,7 @@ def read_config_file(filename):
     elif filename.endswith('.yml'):
         import yaml
         with open(filename, 'r') as f:
-            config = yaml.safe_load(f)
+            config = yaml.load(f, Loader=YamlLoaderWithPyEval)
         cls_name = config['job_config']['class']
         cls = job_classes[cls_name]
         config = cls.expand_from_config(**config)
@@ -738,9 +775,8 @@ def main(args):
         import yaml
         yaml_configs = []
         for fn in args.yaml_parameter_file:
-            # TODO: allow unsafe yaml load by command line option at least
             with open(fn, 'r') as f:
-                yaml_configs.append(yaml.safe_load(f))
+                yaml_configs.append(yaml.load(f, Loader=YamlLoaderWithPyEval))
         config = merge_recursive(*yaml_configs, conflict=args.conflict_merge)
         cls_name = config['job_config']['class']
         cls = job_classes[cls_name]
