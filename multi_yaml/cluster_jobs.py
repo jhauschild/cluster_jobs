@@ -488,6 +488,7 @@ def expand_parameters(nested, *,
                       format_strs=None,
                       expansion='product',
                       output_filename=None,
+                      output_filename_params_key=None,
                       separator='.',
                       ):
     if recursive_keys is None:
@@ -495,17 +496,27 @@ def expand_parameters(nested, *,
     if value_lists is None:
         value_lists = [get_recursive(nested, key, separator) for key in recursive_keys]
     if output_filename is not None:
-        if 'key' in output_filename:
-            out_fn_key = output_filename['key']
-            del output_filename['key']
-        else:
-            out_fn_key = 'output_filename'
+        if output_filename_params_key is not None:
+            raise ValueError("Specify either output_filename or output_filename_params_key "
+                             "in job_config")
+        key = output_filename.pop('key', default='output_filename')
         output_filename.setdefault('separator', separator)
         parts = output_filename.setdefault('parts', {})
         if format_strs is None:
             format_strs = [rkey.split(separator)[-1] + '_{0!s}' for rkey in recursive_keys]
         for key, fstr in zip(recursive_keys, format_strs):
             parts[key] = fstr
+    elif output_filename_params_key is None:
+        if 'output_filename_params' in nested:
+            output_filename_params_key = 'output_filename_params'
+    if output_filename_params_key is not None:
+        parts_key = separator.join([output_filename_params_key, 'parts'])
+        parts = get_recursive(nested, parts_key, separator=separator, default={})
+        format_strs = [rkey.split(separator)[-1] + '_{0!s}' for rkey in recursive_keys]
+        for key, fstr in zip(recursive_keys, format_strs):
+            parts.setdefault(key, fstr)
+        set_recursive(nested, parts_key, parts, separator=separator, insert_dicts=True)
+
     expanded = []
     if expansion == 'product':
         iterator = itertools.product(*value_lists)
@@ -727,6 +738,7 @@ def main(args):
         import yaml
         yaml_configs = []
         for fn in args.yaml_parameter_file:
+            # TODO: allow unsafe yaml load by command line option at least
             with open(fn, 'r') as f:
                 yaml_configs.append(yaml.safe_load(f))
         config = merge_recursive(*yaml_configs, conflict=args.conflict_merge)
