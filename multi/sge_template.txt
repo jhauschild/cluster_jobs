@@ -3,6 +3,7 @@
 #$ -cwd
 # hardware requirements:
 #$ -l h_vmem={mem!s},h_cpu={cpu!s},h_fsize={filesize!s}
+#$ -q cond-mat
 {more_options!s}
 
 set -e   # abort whole script if any command fails
