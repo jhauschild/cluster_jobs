@@ -498,7 +498,7 @@ def expand_parameters(nested, *,
         if output_filename_params_key is not None:
             raise ValueError("Specify either output_filename or output_filename_params_key "
                              "in job_config")
-        key = output_filename.pop('key', default='output_filename')
+        out_fn_key = output_filename.pop('key', 'output_filename')
         output_filename.setdefault('separator', separator)
         parts = output_filename.setdefault('parts', {})
         if format_strs is None:
