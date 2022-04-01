@@ -21,6 +21,7 @@ import sys
 
 from io import StringIO
 
+
 # --------------------------------------
 # Classes for Tasks
 # --------------------------------------
@@ -650,9 +651,9 @@ else: # no ImportError
         except:
             print("\nError while yaml parsing the following !py_eval command:\n", cmd, "\n")
             raise
-        if isinstance(res, np.ndarray) and res.ndim == 1 and len(res) < 20:
+        if "np." in cmd and isinstance(res, np.ndarray) and res.ndim == 1 and len(res) < 20:
             # try to simplify to a list of python scalars
-            # such make a subsequent `yaml.dump()` much prettier
+            # to make a subsequent `yaml.dump()` much prettier
             if res.dtype.kind == 'f':
                 res = [float(v) for v in res]
             elif res.dtype.kind == 'i':
