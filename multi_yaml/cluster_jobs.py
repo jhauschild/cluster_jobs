@@ -208,7 +208,9 @@ class JobConfig(TaskArray):
         job_config['task_parameters'] = task_parameters
         self = cls(**job_config)
         self.expanded_from = config
-        self.config_filename_template = self.config_filename_template[:-3] + 'yml'
+        if 'config_filename_template' not in job_config.keys():
+            # default to yml config instaed of pkl
+            self.config_filename_template = self.config_filename_template[:-3] + 'yml'
         return self
 
     def submit(self):
