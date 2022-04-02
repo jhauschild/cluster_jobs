@@ -38,9 +38,12 @@ job_config:
             suffix: '.pkl'
 
 a: [100, 500, 1000]
-b: 3.1415
+b: !py_eval |
+    2*np.pi
+# cluster_jobs.py supports an extra !py_eval tag for evaluating a python code snippet.
+# Like pickle, this is a security nightmare, so don't use untrusted configs from the internet!
 
 sub_params:
-    c: [0.5, 1.]
+    c: !py_eval |
+       np.arange(0.5, 1.5, 0.5)
     d: 2
-

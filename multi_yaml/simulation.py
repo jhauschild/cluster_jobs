@@ -38,10 +38,10 @@ def run_simulation(**kwargs):
         pickle.dump(results, f)
 
 
-def another_simulation(output_filename, a, b):
+def another_simulation(output_filename, a, b, sub_params):
     """Another example simulation."""
     print("executing another_simulation() in file", __file__)
-    print("got arguments a={a!s},b={b!s}".format(a=a, b=b))
+    print("got arguments a={a!s},b={b!s},sub_params={sub!s}".format(a=a, b=b, sub=sub_params))
     # HERE is where you would usually run your simulation (e.g. some time evolution).
     time.sleep(30)  # simulate simulation: wait for 30 second
     results = {'example_data': np.random.random((3, 3))}
