@@ -640,7 +640,27 @@ else: # no ImportError
         pass
 
     def yaml_eval_construcor(loader, node):
-        """yaml constructor to support `!py_eval "... (python eval code)..."` in yaml files."""
+        """Yaml constructor to support `!py_eval` tag in yaml files.
+
+        It expects one string of python code following the ``!py_eval`` tag.
+        The most reliable method to pass the python code is to use a literal
+        string in yaml, as shown in the example below.
+        We check for "np." in the snippet and ``import numpy as np`` if necessary,
+        to allow convenient constructions of numpy arrays:
+
+        .. code :: yaml
+
+            a: !py_eval |
+                2**np.arange(6, 10)
+            b: !py_eval |
+                [10, 15] + list(range(20, 31, 2)) + [35, 40]
+            c: !py_eval "2*np.pi * 0.3"
+
+        Note that a subsequent ``yaml.dump()`` might contain ugly parts if you construct
+        generic python objects, e.g., a numpy array scalar like ``np.arange(10)[0]``.
+        To avoid this for numpy arrays, we convert them back to lists; but this only works
+        if you only return a single array.
+        """
         cmd = loader.construct_scalar(node)
         if not isinstance(cmd, str):
             raise ValueError("expect string argument to `!py_eval`")
@@ -653,15 +673,8 @@ else: # no ImportError
         except:
             print("\nError while yaml parsing the following !py_eval command:\n", cmd, "\n")
             raise
-        if "np." in cmd and isinstance(res, np.ndarray) and res.ndim == 1 and len(res) < 20:
-            # try to simplify to a list of python scalars
-            # to make a subsequent `yaml.dump()` much prettier
-            if res.dtype.kind == 'f':
-                res = [float(v) for v in res]
-            elif res.dtype.kind == 'i':
-                res = [int(v) for v in res]
-            else:
-                pass
+        if "np." in cmd and isinstance(res, np.ndarray):
+            res = res.tolist() # convert back to list
         return res
 
     yaml.add_constructor("!py_eval", yaml_eval_construcor, Loader=YamlLoaderWithPyEval)
