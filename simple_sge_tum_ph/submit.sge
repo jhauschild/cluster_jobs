@@ -14,9 +14,9 @@
 
 export PATH="/mount/packs/intelpython36/bin:$PATH"
 export MKL_DYNAMIC=FALSE
-export MKL_NUM_THREADS=4   # This should be the *same* number as in the line ``#$ -pe smp ...`` above
-export OMP_NUM_THREADS=4   # This should be the *same* number as in the line ``#$ -pe smp ...`` above
+export MKL_NUM_THREADS=$NSLOTS   # This inserts the *same* number as specified in the line ``#$ -pe smp ...`` above
+export OMP_NUM_THREADS=$NSLOTS   # This inserts the *same* number as specified in the line ``#$ -pe smp ...`` above
 
-echo "Execute  job on host $HOSTNAME at $(date)"
+echo "Execute job on host $HOSTNAME at $(date) with $NSLOTS cores"
 python simulation.py
 echo "finished job at $(date)"
