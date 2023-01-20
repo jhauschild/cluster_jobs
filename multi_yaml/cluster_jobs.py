@@ -3,6 +3,13 @@
 
 """
 # Copyright 2021 jhauschild, MIT License
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
 # I maintain this file at https://github.com/jhauschild/cluster_jobs in multi_yaml/
 
 # requires Python >= 3.5
@@ -20,6 +27,7 @@ from copy import deepcopy
 import sys
 
 from io import StringIO
+
 
 # --------------------------------------
 # Classes for Tasks
@@ -207,7 +215,9 @@ class JobConfig(TaskArray):
         job_config['task_parameters'] = task_parameters
         self = cls(**job_config)
         self.expanded_from = config
-        self.config_filename_template = self.config_filename_template[:-3] + 'yml'
+        if 'config_filename_template' not in job_config.keys():
+            # default to yml config instaed of pkl
+            self.config_filename_template = self.config_filename_template[:-3] + 'yml'
         return self
 
     def submit(self):
@@ -498,7 +508,7 @@ def expand_parameters(nested, *,
         if output_filename_params_key is not None:
             raise ValueError("Specify either output_filename or output_filename_params_key "
                              "in job_config")
-        key = output_filename.pop('key', default='output_filename')
+        out_fn_key = output_filename.pop('key', 'output_filename')
         output_filename.setdefault('separator', separator)
         parts = output_filename.setdefault('parts', {})
         if format_strs is None:
@@ -637,7 +647,27 @@ else: # no ImportError
         pass
 
     def yaml_eval_construcor(loader, node):
-        """yaml constructor to support `!py_eval "... (python eval code)..."` in yaml files."""
+        """Yaml constructor to support `!py_eval` tag in yaml files.
+
+        It expects one string of python code following the ``!py_eval`` tag.
+        The most reliable method to pass the python code is to use a literal
+        string in yaml, as shown in the example below.
+        We check for "np." in the snippet and ``import numpy as np`` if necessary,
+        to allow convenient constructions of numpy arrays:
+
+        .. code :: yaml
+
+            a: !py_eval |
+                2**np.arange(6, 10)
+            b: !py_eval |
+                [10, 15] + list(range(20, 31, 2)) + [35, 40]
+            c: !py_eval "2*np.pi * 0.3"
+
+        Note that a subsequent ``yaml.dump()`` might contain ugly parts if you construct
+        generic python objects, e.g., a numpy array scalar like ``np.arange(10)[0]``.
+        To avoid this for numpy arrays, we convert them back to lists; but this only works
+        if you only return a single array.
+        """
         cmd = loader.construct_scalar(node)
         if not isinstance(cmd, str):
             raise ValueError("expect string argument to `!py_eval`")
@@ -650,15 +680,8 @@ else: # no ImportError
         except:
             print("\nError while yaml parsing the following !py_eval command:\n", cmd, "\n")
             raise
-        if isinstance(res, np.ndarray) and res.ndim == 1 and len(res) < 20:
-            # try to simplify to a list of python scalars
-            # such make a subsequent `yaml.dump()` much prettier
-            if res.dtype.kind == 'f':
-                res = [float(v) for v in res]
-            elif res.dtype.kind == 'i':
-                res = [int(v) for v in res]
-            else:
-                pass
+        if "np." in cmd and isinstance(res, np.ndarray):
+            res = res.tolist() # convert back to list
         return res
 
     yaml.add_constructor("!py_eval", yaml_eval_construcor, Loader=YamlLoaderWithPyEval)
