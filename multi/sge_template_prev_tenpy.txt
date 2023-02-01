@@ -10,6 +10,8 @@ set -e   # abort whole script if any command fails
 export PATH="/mount/packs/intelpython27/bin:$PATH"
 export MKL_DYNAMIC=FALSE
 export MKL_NUM_THREADS={Nslots:d}
+export OMP_NUM_THREADS={Nslots:d}
+export NUMBA_NUM_THREADS={Nslots:d}
 
 # if needed, you can set PYTHONPATH here to include other libraries, e.g.
 TENPYPATH="/space/cmt/tenpy_cluster/prev_tenpy_20180619"
