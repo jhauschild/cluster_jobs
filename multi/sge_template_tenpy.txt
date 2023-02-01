@@ -11,6 +11,7 @@ export PATH="/mount/packs/intelpython36/bin:$PATH"
 export MKL_DYNAMIC=FALSE
 export MKL_NUM_THREADS={Nslots:d}
 export OMP_NUM_THREADS={Nslots:d}
+export NUMBA_NUM_THREADS={Nslots:d}
 
 # if needed, you can set PYTHONPATH here to include other libraries, e.g.
 TENPYPATH="/space/cmt/tenpy_cluster/tenpy_20191009_master"

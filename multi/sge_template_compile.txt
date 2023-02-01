@@ -10,6 +10,8 @@ set -e   # abort whole script if any command fails
 export PATH="/mount/packs/intelpython36/bin:$PATH"
 export MKL_DYNAMIC=FALSE
 export MKL_NUM_THREADS={Nslots:d}
+export OMP_NUM_THREADS={Nslots:d}
+export NUMBA_NUM_THREADS={Nslots:d}
 
 CWD=$(pwd)  # remember directory where we started -> where the output will be
 
