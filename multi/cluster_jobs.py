@@ -484,6 +484,7 @@ def create_sge_script(jobscript_filename, sge_template, config_filename, config)
     replacements.setdefault('mem', '2G')
     replacements.setdefault('filesize', '4G')
     replacements.setdefault('Nslots', 4)
+    replacements.setdefault('queue', 'cond-mat-short')
     cpu_seconds = time_str_to_seconds(replacements['cpu'])
     replacements.setdefault('cpu_seconds', cpu_seconds)
     more_options = replacements.get('more_options', "")
@@ -500,8 +501,6 @@ def create_sge_script(jobscript_filename, sge_template, config_filename, config)
         raise ValueError("Got no parameters in job config!")
     else:
         replacements.setdefault('job_id', "1")
-    if 'queue' in replacements:
-        more_options += "#$ -q " + str(replacements['queue']) + "\n"
     if 'email' in config:
         email = str(config['email'])
         replacements['email'] = email
