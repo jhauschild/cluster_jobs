@@ -1,0 +1,18 @@
+#!/bin/bash
+#
+# Essentially, this is a poor-man's version of [python venv](https://docs.python.org/3/tutorial/venv.html), [conda environments](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html) and/or `module load ...` environements available on many clusters.
+# Depending on your cluster setup, one of those solutions might be better suited for your case.
+#
+# To use it, source this file form the command line with `. project_activate` or equivalently `source project_activate` from the terminal. 
+# Anything within that terminal will then have the environment variables below set.
+
+
+# set the base path to the project
+export PROJECT_DIR="$HOME/path/to/project"
+
+# this allows to directly call `cluster_jobs.py submit ...` even from other directories
+export PATH="$PROJECT_DIR:$PATH"
+
+# if needed, adjust more, e.g.
+# export PATH="/mount/packs/intelpython3/bin:$PYTHONPATH"
+# export PYTHONPATH="$PROJECT_DIR/TeNPy:$PYTHONPATH"
