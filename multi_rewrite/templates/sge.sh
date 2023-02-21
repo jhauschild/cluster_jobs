@@ -1,7 +1,9 @@
 #!/bin/bash
 #$ -S /bin/bash
 #$ -cwd
-#$ -m ae # mail on 'a'bort and/or 'e'xit
+# #$ -m ae # mail on 'a'bort and/or 'e'xit
+# #$ -M your.name@university.gov  # don't use/forward to gmail.com etc
+# # you can get a lot of automated emails, and other email providers might block the whole university for sending too many emails, thinking it's spam.
 {requirements}
 
 set -e  # abort whole script if any command fails

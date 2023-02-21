@@ -1,6 +1,8 @@
 #!/bin/bash
 #SBATCH --job-name={jobname}
 #SBATCH --mail-type=fail
+#SBATCH --mail-user your.name@university.gov  # don't use/forward to gmail.com etc
+# # you can get a lot of automated emails at once, and other email providers might block the whole university for sending too many emails, thinking it's spam.
 #SBATCH --output ./{jobname}.%J.out  # %J=jobid.step, %N=node.
 #SBATCH --chdir=./
 {requirements}

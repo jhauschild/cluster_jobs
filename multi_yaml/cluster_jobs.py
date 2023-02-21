@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 """Tools to submit multiple jobs to the cluster.
 
+I maintain this file at https://github.com/jhauschild/cluster_jobs in multi_yaml/
+
+Requires Python>=3.7
+
+For help see https://github.com/jhauschild/cluster_jobs/tree/main/multi_yaml
 """
 # Copyright 2021-2023 jhauschild, MIT License
 
@@ -9,10 +14,6 @@
 # The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 #
 # THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-# I maintain this file at https://github.com/jhauschild/cluster_jobs in multi_yaml/
-
-# requires Python >= 3.5
 
 import pickle
 import subprocess
