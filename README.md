@@ -1,17 +1,20 @@
-# Utilities/examples to submit jobs to our computing cluster
+## Utilities/examples to submit jobs to our computing cluster
 
-The folder 'simple_sge_tum_ph/' cotains a simple working example how to run a python simulation on the computing cluster of the TU Munich physics department, which is using the Sun Grid Engine (SGE) for job submission (via the `qsub` command). 
+The folder 'simple_sge_tum_ph/' cotains a simple working example how to run a python simulation on the computing cluster of the TU Munich physics department, which is using the [Sun Grid Engine (SGE)]() for job submission (via the `qsub` command). 
 The folder 'simple_slurm_lrz_nim/' contains a simple working example how to run a python simulation on the computing cluster for the NIM cluster of the LRZ, which is using SLURM for the jub submission. 
-Further explanations can be found in our group wiki at https://wiki.tum.de/display/tuphtfk/Cluster+utilisation 
-(password protected, since it gives details about our cluster...).
+Further explanations can be found at the wiki page https://wiki.tum.de/display/nat/SGE+queuing+system (You need a TUM login to read it.)
 
-The 'multi/' folder contains the file `cluster_jobs.py` to simplify submission of many (similar) simulations using Python. 
-Explanations are in the module doc string of `cluster_jobs.py`. 
-It provides the functions `submit_sge(...)` for SGE, `submit_slurm(...)` for SLURM, 
-as well as `run_local(...)` for debugging on a local machine.
+## Advanced submission with `cluster_jobs.py`
 
-The `multi_rewrite/` folder contains an object-oriented rewrite of `multi/cluster_jobs.py` that should make the code a bit clearer.
+The `multi*` folders contain an enhanced setup based around a python script `cluster_jobs.py`, that can aid you (a lot) in submitting multiple jobs at once changing only a few parameters.
+The basic idea is that the `cluster_jobs.py` can generate (and even directly submit) the job script that you would usually submit with `qsub my_job.sh`. However, it sets up a so-called task array on the cluster, which runs the same job many times for slightly different parameters (that you specified before).
 
-The `multi_yaml/` is the newest version and contains another variant that works nicely with human-readable yaml files. This is particularly usefull to quickly inspect submitted details and have all parameters ready, and plays nicely with the simulation framework of [TeNPy](https://github.com/tenpy/tenpy).
+The different `multi*` folders are essentially different versions of this same idea developed over time, with increasing leavel of sophistication.
+The `multi/` folder is the first (legacy) version I wrote, `multi_rewrite` was a rewrite in an object-oriented coding style, and `multi_yaml` is based on that, but extended to support the [yaml file format](https://en.wikipedia.org/wiki/YAML) for submission.
 
-**If you're new** to submitting jobs on the cluster, I'd recommend looking into the `simple_sge_tum_ph/` folder first to get a sense of how the cluster works, and then into the `multi_yaml/` rewrite for production runs. In the latter, you can find a detailed `README.md` with an example how to submit jobs.
+
+The `multi/cluster_jobs.py` has an extensive doc string in the beginning with example usage. The `multi_rewrite/cluster_jobs.py` can essentially be called the same way. The [multi_yaml](https://github.com/jhauschild/cluster_jobs/tree/main/multi_yaml) has an extensive README with explanations, walking you through an example and hinting at a usefull setup.
+
+**If you're new to submitting jobs** on the cluster, I'd recommend looking first into the `simple_sge_tum_ph/` folder first to get a sense of how the cluster works, and then into the `multi_yaml/` folder.
+
+Note: the `cluster_jobs.py` it not specific to SGE, it can also handle SLURM (used at other university clusters).
