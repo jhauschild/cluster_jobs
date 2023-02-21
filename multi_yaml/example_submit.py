@@ -2,6 +2,7 @@
 
 import cluster_jobs
 import copy
+import numpy as np  # only needed if you use np below
 
 config = {
     'jobname': 'MyJob',
@@ -29,9 +30,14 @@ config = {
 }
 
 for a in [100, 500, 1000]:
-    for b in [0.5, 1.]:
-        kwargs = {'a': a, 'b': b}
-        kwargs['output_filename'] = 'result_a_{a:d}_b_{b:.2f}.pkl'.format(a=a, b=b)
+    for c in [0.5, 1.]:
+        kwargs = {
+            'a': a,
+            'b': 2*np.pi,
+            'sub_params': {'c': c, 'd': 2}
+        }
+        # ensure different output filename per simulation:
+        kwargs['output_filename'] = f'result_a_{a:d}_c_{c:.2f}.pkl'
         config['task_parameters'].append(copy.deepcopy(kwargs))
 
 # cluster_jobs.TaskArray(**config).run_local(task_ids=[2, 3], parallel=2) # run selected tasks

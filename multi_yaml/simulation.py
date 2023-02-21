@@ -49,8 +49,3 @@ def another_simulation(output_filename, a, b, sub_params):
     print("save results to ", output_filename)
     with open(output_filename, 'wb') as f:
         pickle.dump(results, f)
-
-
-if __name__ == "__main__":
-    import cluster_jobs
-    cluster_jobs.run_simulation_commandline(globals())
