@@ -2,7 +2,7 @@
 """Tools to submit multiple jobs to the cluster.
 
 """
-# Copyright 2021 jhauschild, MIT License
+# Copyright 2021-2023 jhauschild, MIT License
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 #
@@ -18,13 +18,11 @@ import pickle
 import subprocess
 import os
 import sys
-import warnings
 import importlib
 from pprint import pprint, PrettyPrinter
 import itertools
 from collections.abc import Mapping
 from copy import deepcopy
-import sys
 
 from io import StringIO
 
@@ -34,7 +32,7 @@ from io import StringIO
 # --------------------------------------
 
 
-class Task(object):
+class Task:
     """Abstract base class for a task ("simulation") to be run with a given set of parameters."""
     def run(self, parameters):
         """Run the task once for a given set of `parameters`."""
@@ -82,7 +80,7 @@ class PythonFunctionCall(Task):
                                                                 self.extra_imports)
 
 
-class TaskArray(object):
+class TaskArray:
     """The same task to be run multiple times with different parameters.
 
     We define the `task_id` to start from 1 instead of 0,
@@ -812,7 +810,7 @@ def main(args):
             job.expanded_from['job_config']['filter_task_ids'] = task_ids
         job.submit()
     else:
-        raise ValueError("unknown command " + str(command))
+        raise ValueError("unknown command " + str(args.command))
 
 
 if __name__ == "__main__":
