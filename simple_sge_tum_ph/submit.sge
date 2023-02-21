@@ -9,7 +9,6 @@
 # #$ -m a  # n="NO_MAIL", a="MAIL_AT_ABORT", e="MAIL_AT_EXIT", combination `-m ae` is allowed
 
 #$ -pe smp 4
-#$ -R y
 #$ -q cond-mat
 
 export PATH="/mount/packs/intelpython36/bin:$PATH"

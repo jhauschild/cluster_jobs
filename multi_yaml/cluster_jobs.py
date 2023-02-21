@@ -326,7 +326,6 @@ class SGEJob(JobConfig):
             o['task_id'] = "$SGE_TASK_ID"
         if o.setdefault("cores_per_task", 4) > 1:
             r.setdefault('pe smp', "{cores_per_task:d}")
-            r.setdefault('R', "y")
 
     def get_requirements_line(self, key, value):
         return "#$ -{key} {value}".format(key=key, value=value)
