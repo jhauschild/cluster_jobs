@@ -17,7 +17,7 @@ job_config:
     #     memory:
     #     nodes: 1
     # requirements_sge:
-    #     l: 'h_cpu=0:30:00,h_vmem=5G'  # CPU (wall) time and RAM (per core) requirements
+    #     l: 'h_cpu=0:30:00,h_rss=5G'  # CPU (wall) time and RAM (per core) requirements
     #     q: 'cond-mat'  # queue to submit to
     # options:
     #     cores_per_task: 2
