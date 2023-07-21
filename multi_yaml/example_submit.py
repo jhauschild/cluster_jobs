@@ -19,7 +19,7 @@ config = {
         # 'mail-user': "no@example.com",
     },
     #  'requirements_sge': {  # for SGE
-    #      'l': 'h_cpu=0:30:00,h_vmem=4G',
+    #      'l': 'h_cpu=0:30:00,h_rss=4G',
     #      'q': 'queue',
     #      # 'M': "no@example.com"
     #  },

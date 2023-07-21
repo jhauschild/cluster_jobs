@@ -2,7 +2,7 @@
 #$ -S /bin/bash
 #$ -cwd
 # hardware requirements:
-#$ -l h_vmem={mem!s},h_cpu={cpu!s},h_fsize={filesize!s}
+#$ -l h_rss={mem!s},h_cpu={cpu!s},h_fsize={filesize!s}
 #$ -q {queue!s}
 {more_options!s}
 
