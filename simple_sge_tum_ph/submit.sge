@@ -2,7 +2,7 @@
 #$ -S /bin/bash
 #$ -cwd
 # hardware requirements:
-#$ -l h_vmem=3G,h_cpu=0:59:00,h_fsize=2G
+#$ -l h_rss=3G,h_cpu=0:59:00,h_fsize=2G
 
 # if you want to get notified by email, remove the first `# ` from the following lines (such that they start with `#$ -...`)
 # #$ -M max.mustermann@tum.de  # put your email address here!
