@@ -1,22 +1,21 @@
 #!/bin/bash
 
-#SBATCH --job-name MyJob                   # descriptive name show in queue and used for output files
+# hardware requirements
 #SBATCH --time=00:10:00                    # enter a maximum runtime for the job. (format: DD-HH:MM:SS, or just HH:MM:SS)
 #SBATCH --cpus-per-task=4                  # use multi-threading with 4 cpu threads (= 2 physical cores + hyperthreading)
 #SBATCH --mem=5G                           # request this amount of memory for each task
 
-#SBATCH --qos=debug                        # Submit debug job for quick test. See `sacctmgr show qos` for options
- 
 # you need the following settings for students jobs
-#SBATCH --gpus=1                           # request the gpu
 #SBATCH --partition=gpu                    # on the gpu partition
+#SBATCH --qos=gpu                          # with teh gpu (or debug) qos
+#SBATCH --gpus=1                           # request the gpu
 #SBATCH --account=gpu_manual               # with a non-default account (limited access!)
-#SBATCH --reservation=gpu                  # using the cpu/ram set aside
+#SBATCH --reservation=gpu                  # using the cpu/ram set aside for the CPU calculations
 
 
+# some further useful options, uncomment as needed/desired
+#SBATCH --job-name MyJob                   # descriptive name shown in queue and used for output files
 #SBATCH --output %x.%j.out                 # this is where the (text) output goes. %x=Job name, %j=Jobd id, %N=node.
-
-# some further useful options, uncomment if desired
 # #SBATCH --error  %x.%j.err               # uncomment if you want separate stdout and stderr
 # #SBATCH --mail-type=ALL                  # uncomment to ask for email notification.
 # #SBATCH --mail-user=invalid@example.com  # email to send to. Defaults to your personal ga12abc@mytum.de address

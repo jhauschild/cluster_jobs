@@ -1,7 +1,6 @@
 #!/bin/bash
 
 # hardware requirements
-#SBATCH --job-name MyJob                   # descriptive name show in queue and used for output files
 #SBATCH --time=00:10:00                    # enter a maximum runtime for the job. (format: DD-HH:MM:SS, or just HH:MM:SS)
 # note: you need to read out the $SLURM_CPUS_PER_TASK in the mathematica script to make use of the parallelization!
 #SBATCH --cpus-per-task=4                  # use multi-threading with 4 cpu threads (= 2 physical cores + hyperthreading)
@@ -10,9 +9,9 @@
 #SBATCH --partition=cpu                    # optional, cpu is default. needed for gpu/classes. See `sinfo` for options
 #SBATCH --qos=debug                        # Submit debug job for quick test. See `sacctmgr show qos` for options
 
+# some further useful options, uncomment as needed/desired
+#SBATCH --job-name MyJob                   # descriptive name shown in queue and used for output files
 #SBATCH --output %x.%j.out                 # this is where the (text) output goes. %x=Job name, %j=Jobd id, %N=node.
-
-# some further useful options, uncomment if desired
 # #SBATCH --error  %x.%j.err               # uncomment if you want separate stdout and stderr
 # #SBATCH --mail-type=ALL                  # uncomment to ask for email notification.
 # #SBATCH --mail-user=invalid@example.com  # email to send to. Defaults to your personal ga12abc@mytum.de address
