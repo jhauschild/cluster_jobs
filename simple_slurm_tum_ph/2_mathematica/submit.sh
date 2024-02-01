@@ -17,7 +17,7 @@
 # #SBATCH --mail-user=invalid@example.com  # email to send to. Defaults to your personal ga12abc@mytum.de address
 # #SBATCH --get-user-env                   # If active, copy environment variables from submission to the the job
 # #SBATCH --chdir ./                       # change to the specified directory
-# #SBATCH --constraint "jammy&intel"       # select Ubuntu version and/or cpu. See `scontrol show config | grep Feature`
+# #SBATCH --constraint "Ubuntu22.04&intel" # select Ubuntu version and cpu family. See `scontrol show config | grep Feature`
 
 # to select a sepcific mathematica version, uncomment:
 export PATH="/mount/packs/Mathematica13.2/:$PATH"

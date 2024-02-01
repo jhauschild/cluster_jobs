@@ -18,7 +18,7 @@
 # #SBATCH --mail-user=invalid@example.com  # email to send to. Defaults to your personal ga12abc@mytum.de address
 # #SBATCH --get-user-env                   # If active, copy environment variables from submission to the the job
 # #SBATCH --chdir ./                       # change to the specified directory
-# #SBATCH --constraint "jammy&intel"       # select Ubuntu version and/or cpu. See `scontrol show config | grep Feature`
+# #SBATCH --constraint "Ubuntu22.04&intel" # select Ubuntu version and cpu family. See `scontrol show config | grep Feature`
 
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK  # number of CPUs per node, total for all the tasks below.
 # see `man sbatch` for further possible environment variables you can use
