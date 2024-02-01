@@ -1,8 +1,7 @@
 """Example simulation file, containing a function that (usually) runs for a very long time...
 
-To run your own simulations, simply edit this file by your liking.
-After adjusting the hardware requirements in the `submit.sge`, you can
-submit a job to our cluster with `qsub submit.sge`."""
+To run your own simulations, adjust the functions to your liking,
+but keep (or copy & paste) the last 3 lines of this file."""
 
 from __future__ import print_function
 import numpy as np
@@ -11,7 +10,7 @@ import time
 
 
 def run_simulation(**kwargs):
-    """Example simulation.
+    """Example dummy simulation.
 
     You could imagine this function to run a costly simulation (e.g. DMRG).
 
@@ -22,13 +21,25 @@ def run_simulation(**kwargs):
     print("got the dictionary kwargs =", kwargs)
 
     # HERE is where you would usually run your simulation (e.g. DMRG).
-    # simulate some heavy calculations:
-    for i in range(30):
-        print("step ", i, flush=True)  # (remove `flush=True` for Python 2)
-        # the flush=True makes the output appear immediately
-        time.sleep(5)
+    # in this dummy simulation, we mimic some heavy calculations:
+    # we draw roughly `use_GB` gigabytes of random numbers, and sum them up.
+    run_mins = kwargs.get('run_mins', 0.5)
+    use_GB = kwargs.get('use_GB', 1.)
+    GB_size = int(1024**3 *8/64)  # assuming 64-bit numbers
+    total_size = int(use_GB*GB_size)
 
-    results = {'kwargs': kwargs, 'example_data': np.random.random((2, 2))}
+    sums = []
+    start_time = time.time()
+    while time.time() - start_time < 60. * run_mins:
+        random_numbers = np.random.random(size=total_size)
+        y = np.sum(random_numbers)
+        print("example: sum of random numbers =", y)
+        time.sleep(10.)  # wait to give time to check memory usage while using all of it
+        del random_numbers  # don't duplicate memory usage when initializing in next loop
+        sums.append(y)
+
+    results = {'kwargs': kwargs, 'sums': sums, 'average': np.mean(sums)}
+    print("produced results =" , results)
 
     output_filename = kwargs['output_filename']
     print("save results to ", output_filename)
@@ -36,10 +47,10 @@ def run_simulation(**kwargs):
         pickle.dump(results, f)
 
 
-def another_simulation(output_filename, a, b):
+def another_simulation(output_filename, a, b, sub_params):
     """Another example simulation."""
     print("executing another_simulation() in file", __file__)
-    print("got arguments a={a!s},b={b!s}".format(a=a, b=b))
+    print("got arguments a={a!s},b={b!s},sub_params={sub!s}".format(a=a, b=b, sub=sub_params))
     # HERE is where you would usually run your simulation (e.g. some time evolution).
     time.sleep(30)  # simulate simulation: wait for 30 second
     results = {'example_data': np.random.random((3, 3))}
@@ -50,4 +61,14 @@ def another_simulation(output_filename, a, b):
 
 
 if __name__ == "__main__":
-    run_simulation(output_filename="output_simple.pkl", a=1, b=2)
+    # allow to call this script like `python simulation.py <RUN_MINS> <USE_GB>`
+    import sys
+    if len(sys.argv) == 3:
+        run_mins = int(sys.argv[1])
+        use_GB = float(sys.argv[2])
+    else:
+        run_mins = 10
+        use_GB = 2.
+    filename = "output_simple_run_{run_mins:d}m_use_{use_GB:.1f}GB.pkl"
+    filename = filename.format(run_mins=run_mins, use_GB=use_GB)
+    run_simulation(output_filename=filename, run_mins=run_mins, use_GB=use_GB)

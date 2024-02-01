@@ -715,7 +715,7 @@ def time_str_to_seconds(time):
         iv * int(t) for iv, t in zip(intervals, reversed(time.replace('-', ':').split(':'))))
 
 
-def parse_commandline_arguments():
+def commandline_arguments_parser():
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument("-v", "--verbose", action="store_true", help="Print steps taken.")
@@ -754,11 +754,11 @@ def parse_commandline_arguments():
     parser_show.add_argument("configfile", help="job configuration, e.g. 'myjob.config.pkl'")
     parser_show.add_argument("task_id", type=int, nargs="*",
                              help="task id(s) for which to show stuff; default: all or --missing")
+    return parser
+
+
+def main(parser):
     args = parser.parse_args()
-    return args
-
-
-def main(args):
     if args.command == "run":
         task_array = read_config_file(args.configfile)
         task_array.run_local(args.task_id, args.parallel, args.missing)
@@ -811,9 +811,10 @@ def main(args):
             job.expanded_from['job_config']['filter_task_ids'] = task_ids
         job.submit()
     else:
-        raise ValueError("unknown command " + str(args.command))
+        parser.print_usage()
+        sys.exit(1)
 
 
 if __name__ == "__main__":
-    args = parse_commandline_arguments()
-    main(args)
+    parser = commandline_arguments_parser()
+    main(parser)

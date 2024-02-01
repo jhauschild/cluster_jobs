@@ -1,15 +1,14 @@
 #!/bin/bash
-#$ -S /bin/bash
-#$ -cwd
+#$ -S /bin/bash                               # shell used by SGE
+#$ -cwd                                       # run job in the directory where you submitted it
 # hardware requirements:
-#$ -l h_rss=3G,h_cpu=0:59:00,h_fsize=2G
-
-# if you want to get notified by email, remove the first `# ` from the following lines (such that they start with `#$ -...`)
-# #$ -M max.mustermann@tum.de  # put your email address here!
+#$ -l h_vmem=3G,h_cpu=0:59:00,h_fsize=2G      # maximal memory per core and maximal wall time to run the job
+#$ -pe smp 4                                  # run on 4 cores
+#$ -q cond-mat-short                          # submit to selected queue only
+# 
+# if you want to get notified by email, remove the first `# ` from the following lines (such that they start with `#$ `)
+# #$ -M YOUR.EMAIL@tum.de                     # put your email address here!
 # #$ -m a  # n="NO_MAIL", a="MAIL_AT_ABORT", e="MAIL_AT_EXIT", combination `-m ae` is allowed
-
-#$ -pe smp 4
-#$ -q cond-mat
 
 export PATH="/mount/packs/intelpython36/bin:$PATH"
 export MKL_DYNAMIC=FALSE

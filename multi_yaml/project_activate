@@ -1,14 +1,16 @@
 #!/bin/bash
 #
-# Essentially, this is a poor-man's version of [python venv](https://docs.python.org/3/tutorial/venv.html), [conda environments](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html) and/or `module load ...` environements available on many clusters.
+# This is a poor-man's version of
+# [python venv](https://docs.python.org/3/tutorial/venv.html), 
+# [conda environments](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html) 
+# and/or `module load ...` environements like [lmod](https://lmod.readthedocs.io/en/latest/010_user.html) available on many clusters.
 # Depending on your cluster setup, one of those solutions might be better suited for your case.
 #
 # To use it, source this file form the command line with `. project_activate` or equivalently `source project_activate` from the terminal. 
 # Anything within that terminal will then have the environment variables below set.
 
-
 # set the base path to the project
-export PROJECT_DIR="$HOME/path/to/project"
+export PROJECT_DIR="$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"  # the folder where this script is
 
 # this allows to directly call `cluster_jobs.py submit ...` even from other directories
 export PATH="$PROJECT_DIR:$PATH"

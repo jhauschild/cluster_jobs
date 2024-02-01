@@ -15,20 +15,21 @@ Say you have the python module `simulation.py` (an example is provided) with a f
 `run_simulation` that takes certain keyword arguments.
 You can look at the example, which sleeps for a few seconds and then writes data (that it might have computed) to the `output_filename` given as argument.
 
-Say you want to run on the cluster:
+Say you want to run the following on the cluster:
 ```python
 for a in [100, 500, 1000]:
     for c in [0.5, 1.0]:
         kwargs = {
-            'a': a, 
+            'a': a,
             'b': 2*np.pi,
-            'sub_params': {'c: c, d: 2}
+            'sub_params': {'c': c, 'd': 2}
         }
         # ensure different output filename per simulation:
         kwargs['output_filename'] = f"output_{a!s}_c_{c!s}.pkl" 
         # run following line on independent nodes in the cluster
         simulation.run_simulation(**kwargs)
 ```
+
 However, you also need to specify the setup to the cluster - how much time would you estimate for each time, how much RAM do you need? The cluster needs to know that
 to correctly schedule the job.
 Therefore, you also have to specify a `job_config` dictionary with the required information: what cluster system do you use, what resources do you need, which parameters do you want to change?
@@ -41,7 +42,7 @@ In the given example, it actually just runs the specified jobs sequentially, sin
 Try running it. You should see that it runs 6 tasks, and get a bunch of output files:
 
 - `MyJob.config.yml` is the config of the job you just submitted, so you can easily look at what you wanted to run here.
-- `MyJob.run.*` is the job file that would be submitted to the cluster with `qsub MyJob.run.sge` or `sbatch MyJob.run.slurm`. When running locally, `MyJob.run.sh` is just a simple bash script.
+- `MyJob.run.*` is the job file that would be submitted to the cluster with `sbatch MyJob.run.sge` or `qsub MyJob.run.slurm`. When running locally, `MyJob.run.sh` is just a simple bash script.
 - Further, you get the expected `output_a_*_c_*.pkl` files, and 
 - one `MyJob.task_*.out` with standard-out for each task that was run. This is where you find error messages.
 

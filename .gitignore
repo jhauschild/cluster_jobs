@@ -2,3 +2,6 @@ MyJob*
 *.pyc
 *.pkl
 *.out
+*.err
+test*
+tmp*
