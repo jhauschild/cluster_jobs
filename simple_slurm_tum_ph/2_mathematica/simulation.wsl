@@ -1,0 +1,5 @@
+Print["Hello World"]
+LaunchKernels[ToExpression[Environment["SLURM_CPUS_PER_TASK"]]]
+(* define a function that you want to evalute in parallel,
+   and use it in the ParallelEvaluate below... *)
+Print[ParallelEvaluate[$ProcessID]]
