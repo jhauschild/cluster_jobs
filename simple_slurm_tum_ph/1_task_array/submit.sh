@@ -25,6 +25,8 @@
 # #SBATCH --chdir ./                       # change to the specified directory
 # #SBATCH --constraint "Ubuntu22.04&intel" # select Ubuntu version and cpu family. See `scontrol show config | grep Feature`
 
+set -e  # abort the whole script if one command fails
+
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK  # number of CPUs per node, total for all the tasks below.
 # see `man sbatch` for further possible environment variables you can use
 
@@ -32,7 +34,7 @@ export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK  # number of CPUs per node, total fo
 # source /mount/packs/ml-2023/bin/activate
 # export PYTHONPATH="$HOME/MyLibrary"
 
-echo "starting job on $(hostname) at $(date)"
+echo "starting job on $(hostname) at $(date) with $SLURM_CPUS_PER_TASK cores"
 # example array simulation
 python ./simulation_array.py  $SLURM_ARRAY_TASK_ID
 echo "finished job at $(date)"

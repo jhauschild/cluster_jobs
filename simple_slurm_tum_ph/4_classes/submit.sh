@@ -20,6 +20,8 @@
 # #SBATCH --chdir ./                       # change to the specified directory
 # #SBATCH --constraint "Ubuntu22.04&intel" # select Ubuntu version and cpu family. See `scontrol show config | grep Feature`
 
+set -e  # abort the whole script if one command fails
+
 export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK  # number of CPUs per node, total for all the tasks below.
 # see `man sbatch` for further possible environment variables you can use
 
@@ -28,6 +30,9 @@ export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK  # number of CPUs per node, total fo
 # export PYTHONPATH="$HOME/MyLibrary"
 
 echo "starting job on $(hostname) at $(date) with $SLURM_CPUS_PER_TASK cores"
-# example running for 3 minutes using 1.5 GB
-python ./simulation.py  3 1.5
+# example call of your simulation. 
+python ./simulation.py 3 1.5
+# This specific example takes desired runtime [minutes] and memory [GB] as command line args.
+# This allows you to check what happens e.g. if you go beyond those limits - the cluster should abort your job in that case.
+# For your actual simulation, you can have abitrary, different parameters here.
 echo "finished job at $(date)"

@@ -19,6 +19,8 @@
 # #SBATCH --chdir ./                       # change to the specified directory
 # #SBATCH --constraint "Ubuntu22.04&intel" # select Ubuntu version and cpu family. See `scontrol show config | grep Feature`
 
+set -e  # abort the whole script if one command fails
+
 # to select a sepcific mathematica version, uncomment:
 export PATH="/mount/packs/Mathematica13.2/:$PATH"
 
