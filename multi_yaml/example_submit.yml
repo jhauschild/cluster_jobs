@@ -1,26 +1,31 @@
-#!/bin/bash 
+#!/bin/bash
 
 job_config:
-    class: JobConfig  # JobConfig = run locally; SlurmJob = submit to slurm; SGEJob = submit to SGE
+    class: SlurmJob  # JobConfig = run locally; SlurmJob = submit to slurm; SGEJob = submit to SGE
     jobname: MyJob
     task:  # specify what your job actually does
         type: PythonFunctionCall
         module: simulation
         function: run_simulation
-        # extra_imports: 
+        # extra_imports:
         #     - my_other_py_module
 
-    # script_template: slurm.sh  # select from cluster_templates/
+    script_template: slurm.sh  # select from cluster_templates/
     # # adjust the following lines to tell the cluster the resource requirements
-    # requirements_slurm:
-    #     time: '0:30:00'
-    #     memory:
-    #     nodes: 1
+    requirements_slurm:
+        time: '0-00:30:00'  # d-hh:mm:ss
+        mem: '5G'
+        partition: 'cpu'
+        qos: 'debug'
+        nodes: 1
+        # mail-type: "FAIL"  # be mindful with this if you submit a lot of jobs...
+        # see also cluster_templates/slurm.sh
     # requirements_sge:
     #     l: 'h_cpu=0:30:00,h_rss=5G'  # CPU (wall) time and RAM (per core) requirements
     #     q: 'cond-mat'  # queue to submit to
+    #     'pe smp': 4
     # options:
-    #     cores_per_task: 2
+    #     ... # you can add extra variables for the script_template in cluster_templates/* here
 
     change_parameters:
         expansion: product  # product or zip
@@ -30,7 +35,7 @@ job_config:
         # value_lists: 
         #     - [ 128, 256, 512]
         #     - [0.5, 1.]
-        #     # you can either specify all the value_lists for all parameters here, 
+        #     # you can either specify all the value_lists for all parameters here,
         #     # or have the lists distributed over the rest of the yaml file(s).
         # format_strs:  # this allows formatting of output_filename
         #     - 'a_{0:04d}'

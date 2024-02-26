@@ -1,7 +1,8 @@
 """Example simulation file, containing a function that (usually) runs for a very long time...
 
-To run your own simulations, adjust the functions to your liking,
-but keep (or copy & paste) the last 3 lines of this file."""
+In the advanced setup in `multi_yaml`, you just specify the function to be used
+inside the example_submit.yml (or example_submit.py) as `job_config: task: ...`
+"""
 
 from __future__ import print_function
 import numpy as np
