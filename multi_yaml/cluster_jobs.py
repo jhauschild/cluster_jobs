@@ -7,7 +7,7 @@ Requires Python>=3.7
 
 For help see https://github.com/jhauschild/cluster_jobs/tree/main/multi_yaml
 """
-# Copyright 2021-2023 jhauschild, MIT License
+# Copyright 2021-2024 jhauschild, MIT License
 
 # Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the “Software”), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
 #
@@ -215,7 +215,7 @@ class JobConfig(TaskArray):
         self = cls(**job_config)
         self.expanded_from = config
         if 'config_filename_template' not in job_config.keys():
-            # default to yml config instaed of pkl
+            # default to yml config instead of pkl
             self.config_filename_template = self.config_filename_template[:-3] + 'yml'
         return self
 
@@ -315,16 +315,22 @@ class SGEJob(JobConfig):
         subprocess.call(cmd_submit)
 
     def update_requirements(self):
-        o = self.options
-        r = self.requirements
-        r.update(self.requirements_sge)
+        self.requirements.update(self.requirements_sge)
         if self.N_tasks == 1:
-            o['task_id'] = 1
+            self.options['task_id'] = 1
         else:
-            r.setdefault('t', '1-{N_tasks:d}')
-            o['task_id'] = "$SGE_TASK_ID"
-        if o.setdefault("cores_per_task", 4) > 1:
-            r.setdefault('pe smp', "{cores_per_task:d}")
+            self.requirements.setdefault('t', '1-{N_tasks:d}')
+            self.options['task_id'] = "$SGE_TASK_ID"
+        if 'cores_per_task' in self.options:
+            msg = ("The 'cores_per_task' option for cluster_jobs.py has been removed.\n"
+                   "Instead, directly put \n"
+                   "  job_config: \n"
+                   "     sge_requirements:\n"
+                   "       'pe smp': 4\n"
+                   "below/above the\n"
+                   "        l: 'h_cpu=0:30:00,h_rss=5G'\n"
+                   )
+            raise ValueError(msg)
 
     def get_requirements_line(self, key, value):
         return "#$ -{key} {value}".format(key=key, value=value)
@@ -338,7 +344,7 @@ class SlurmJob(JobConfig):
         super(SlurmJob, self).__init__(**kwargs)
 
     def submit(self):
-        if self.N_tasks > 1000:
+        if self.N_tasks > 5000:
             raise ValueError("Refuse to submit {0:d} tasks at once.".format(self.N_tasks))
         script_file = self.prepare_submit()
         cmd_submit = ['sbatch', script_file]
@@ -346,14 +352,16 @@ class SlurmJob(JobConfig):
         subprocess.call(cmd_submit)
 
     def update_requirements(self):
-        o = self.options
-        r = self.requirements
-        r.update(self.requirements_slurm)
+        self.requirements.update(self.requirements_slurm)
         if self.N_tasks == 1:
-            o['task_id'] = 1
+            self.options['task_id'] = 1
         else:
-            r.setdefault('array', '1-{N_tasks:d}')
-            o['task_id'] = "$SLURM_ARRAY_TASK_ID"
+            self.requirements.setdefault('array', '1-{N_tasks:d}')
+            self.options['task_id'] = "$SLURM_ARRAY_TASK_ID"
+        if 'cores_per_task' in self.options:
+            msg = ("The 'cores_per_task' option for cluster_jobs.py has been removed.\n"
+                   "It worked only for SGEJob anyways.")
+            raise ValueError(msg)
 
     def get_requirements_line(self, key, value):
         return "#SBATCH --{key}={value}".format(key=key, value=value)
