@@ -3,7 +3,7 @@
 # hardware requirements
 #SBATCH --time=00:10:00                    # enter a maximum runtime for the job. (format: DD-HH:MM:SS, or just HH:MM:SS)
 #SBATCH --cpus-per-task=4                  # use multi-threading with 4 cpu threads (= 2 physical cores + hyperthreading)
-#SBATCH --mem=5G                           # request this amount of memory for each task
+#SBATCH --mem=1G                           # request this amount of memory (total per node)
 
 # you need the following settings for students jobs
 #SBATCH --partition=gpu                    # on the gpu partition
@@ -37,7 +37,7 @@ echo "starting gpu job on $(hostname) at $(date) with $SLURM_CPUS_PER_TASK cores
 echo "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
 nvidia-smi  # prints GPU details (and makes sure it is available)
 # example call of your simulation. 
-python ./simulation.py 3 1.5
+python ./simulation.py 3 0.5
 # This specific example takes desired runtime [minutes] and memory [GB] as command line args.
 # This allows you to check what happens e.g. if you go beyond those limits - the cluster should abort your job in that case.
 # For your actual simulation, you can have abitrary, different parameters here.

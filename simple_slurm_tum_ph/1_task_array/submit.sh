@@ -1,10 +1,9 @@
 #!/bin/bash
 
 # hardware requirements
-#SBATCH --job-name MyJob                   # descriptive name show in queue and used for output files
 #SBATCH --time=00:10:00                    # enter a maximum runtime for the job. (format: DD-HH:MM:SS, or just HH:MM:SS)
 #SBATCH --cpus-per-task=4                  # use multi-threading with 4 cpu threads (= 2 physical cores + hyperthreading)
-#SBATCH --mem=5G                           # request this amount of memory for each task
+#SBATCH --mem=5G                           # request this amount of memory (total per node)
 
 #SBATCH --partition=cpu                    # optional, cpu is default. needed for gpu/classes. See `sinfo` for options
 #SBATCH --qos=debug                        # Submit debug job for quick test. See `sacctmgr show qos` for options

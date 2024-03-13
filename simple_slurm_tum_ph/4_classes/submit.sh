@@ -3,7 +3,7 @@
 # hardware requirements
 #SBATCH --time=00:10:00                    # enter a maximum runtime for the job. (format: DD-HH:MM:SS, or just HH:MM:SS)
 #SBATCH --cpus-per-task=4                  # use multi-threading with 4 cpu threads (= 2 physical cores + hyperthreading)
-#SBATCH --mem=5G                           # request this amount of memory for each task
+#SBATCH --mem=5G                           # request this amount of memory (total per node)
 
 # you need the following settings for student jobs in teaching classes
 #SBATCH --partition=classes                # use the classed partiton
