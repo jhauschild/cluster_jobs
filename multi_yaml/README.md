@@ -56,6 +56,19 @@ You can also specify the `job_config.script_template` to any file in the `cluste
 As an alternative to the YAML format, you can also submit jobs with a python script like `example_submit.py`.
 Personally, though, I found the YAML file format much more convenient to quickly change things in a readable fashion.
 
+## Extended yaml syntax with `!py_eval`
+Note that we extend the standard YAML syntax a little bit by allowing additional `!py_eval` yaml tags, that evaluate the following string with python's `eval()`.
+The most reliable method to pass the python code is to use a literal string in yaml, as shown in the example below.
+We check for "np." in the snippet and ``import numpy as np`` if necessary, to allow convenient constructions of numpy arrays:
+```yaml
+a: !py_eval |
+    2**np.arange(6, 10)
+b: !py_eval |
+    [10, 15] + list(range(20, 31, 2)) + [35, 40]
+c: !py_eval "2*np.pi * 0.3"
+
+A subsequent ``yaml.dump()`` might contain ugly parts if you constructgeneric python objects, e.g., a numpy array scalar like ``np.arange(10)[0]``.
+To avoid this for numpy arrays, we convert them back to lists; but this only works if you only return a single array.
 
 ## Useful directory setup
 While you can save everything just somewhere in your home directory on your personal laptop, clusters of have a file system quota in $HOME, which allows you to save only a limited amount of data.
