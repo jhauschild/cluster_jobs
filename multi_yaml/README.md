@@ -66,6 +66,7 @@ a: !py_eval |
 b: !py_eval |
     [10, 15] + list(range(20, 31, 2)) + [35, 40]
 c: !py_eval "2*np.pi * 0.3"
+```
 
 A subsequent ``yaml.dump()`` might contain ugly parts if you constructgeneric python objects, e.g., a numpy array scalar like ``np.arange(10)[0]``.
 To avoid this for numpy arrays, we convert them back to lists; but this only works if you only return a single array.
