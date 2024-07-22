@@ -337,6 +337,7 @@ class SGEJob(JobConfig):
 
 
 class SlurmJob(JobConfig):
+    """Submit the different tasks as parallel slurm jobs (as a task array)."""
     def __init__(self, requirements_slurm={}, **kwargs):
         self.requirements_slurm = requirements_slurm
         kwargs.setdefault('script_template', "slurm.sh")
@@ -367,10 +368,29 @@ class SlurmJob(JobConfig):
         return "#SBATCH --{key}={value}".format(key=key, value=value)
 
 
+class SlurmSequentialJob(SlurmJob):
+    """Submit a single slurm job running all tasks sequentially.
+
+    This is useful for consistent benchmarks where you want all the different jobs
+    to run on the same hardware node."""
+
+    def update_requirements(self):
+        self.requirements.update(self.requirements_slurm)
+        if self.N_tasks == 1:
+            self.options['task_id'] = 1
+        else:
+            self.options['task_id'] = " ".join(map(str, self.task_ids))
+        if 'cores_per_task' in self.options:
+            msg = ("The 'cores_per_task' option for cluster_jobs.py has been removed.\n"
+                   "It worked only for SGEJob anyways.")
+            raise ValueError(msg)
+
+
 job_classes = {'TaskArray': TaskArray,
                'JobConfig': JobConfig,
                'SGEJob': SGEJob,
-               'SlurmJob': SlurmJob}
+               'SlurmJob': SlurmJob,
+               'SlurmSequentialJob': SlurmSequentialJob}
 
 
 # --------------------------------------
