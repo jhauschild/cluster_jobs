@@ -18,15 +18,10 @@ set -e  # abort whole script if any command fails
 # conda activate tenpy
 {environment_setup}
 
-# When requesting --cpus-per-task 32 on nodes with CPU hyperthreading,
-# slurm will allocate the job 32 threads = 16 cores x 2 threads per core.
-# For numerical applications, e.g MKL functions like BLAS/LAPACK functions, it is better to ignore
-# hyperthreading and rather set NUM_THREADS to the number of physical cores.
-# Hence we divide by 2 here:
-export OMP_NUM_THREADS=$(($SLURM_CPUS_PER_TASK / 2 ))  # number of CPUs per node, total for all the tasks below.
+export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK  # number of CPUs per node, total for all the tasks below.
 export MKL_DYNAMIC=FALSE
-export MKL_NUM_THREADS=$(( $SLURM_CPUS_PER_TASK / 2 ))  # number of CPUs per node, total for all the tasks below.
-export NUMBA_NUM_THREADS=$(( $SLURM_CPUS_PER_TASK / 2))
+export MKL_NUM_THREADS=$SLURM_CPUS_PER_TASK  # number of CPUs per node, total for all the tasks below.
+export NUMBA_NUM_THREADS=$SLURM_CPUS_PER_TASK
 
 echo "Running task {task_id} specified in {config_file} on $HOSTNAME at $(date)"
 python {cluster_jobs_module} run {config_file} {task_id}

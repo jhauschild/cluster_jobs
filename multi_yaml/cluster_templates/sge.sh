@@ -27,5 +27,7 @@ export NUMBA_NUM_THREADS=$NSLOTS
 echo "NSLOTS=$NSLOTS"
 
 echo "Running task {task_id} of {config_file} on $HOSTNAME at $(date)"
-python {cluster_jobs_module} run {config_file} {task_id} &> "{jobname}.task_{task_id}.out"
+python {cluster_jobs_module} run {config_file} {task_id}
+# if you want to redirect output to file, you can append the following to the line above:
+#     &> "{jobname}.task_{task_id}.out"
 echo "finished at $(date)"
