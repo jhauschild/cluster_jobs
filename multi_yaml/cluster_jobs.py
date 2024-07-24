@@ -42,19 +42,53 @@ class Task:
 
 
 class CommandCall(Task):
-    """Call a Command with given arguments."""
-    def __init__(self, command):
+    """Call a Command with given arguments specified through the parameters.
+
+    Parameters
+    ----------
+    command : (list of) str
+        The command to be called, e.g. ``"julia"`` or ``["julia", "-t", "4"]``.
+    command_line_args : None | list of {str | dict}
+        Each entry is one argument for the `command` (separated by space on the terminal).
+        If it's just a string, its taken directly.
+        A dictionary with ``(key, format_)`` items is replaced in :meth:`run` with an argument
+        given by ``format_.format(get_recursive(parameters, key))``.
+        The `format_` can be None/empty, in which case we just format the value as string.
+        If `command_line_args` is None / not given, the `parameters` in :meth:`run` should be a
+        list of string rather than a dictionary (The latter is incompatible with the yaml setup).
+    **subprocess_args :
+        Further keyword arguments for :func:`subprocess.run`,
+        e.g. ``shell=True``, ``env=...``, ``cwd=...``.
+    """
+    def __init__(self, command, command_line_args=None, **subprocess_args):
         self.command = command
+        self.command_line_args = command_line_args
+        subprocess_args.setdefault('check', True)
+        self.subprocess_args = subprocess_args
 
     def run(self, parameters):
-        cmd = [self.command] + parameters
-        print("call", ' '.join(cmd))
-        res = subprocess.call(cmd)
-        if res > 0:
-            raise ValueError("Error while running command " + ' '.join(cmd))
+        cmd = [self.command] if isinstance(self.command, str) else list(self.command)
+        if self.command_line_args is not None:
+            for arg in self.command_line_args:
+                if isinstance(arg, dict):
+                    for key, format_ in arg.items():
+                        value = get_recursive(parameters, key)
+                        if isinstance(value, list):
+                            for val in value:
+                                val = format_.format(val) if format_ else str(val)
+                                cmd.append(val)
+                        else:
+                            value = format_.format(value) if format_ else str(value)
+                            cmd.append(value)
+                else:
+                    cmd.append(arg)  # simple string
+        if self.subprocess_args.get('shell', False):
+            cmd = ' '.join(cmd)
+        print(f"calling: {cmd!r}")
+        res = subprocess.run(cmd, **self.subprocess_args)
 
     def __repr__(self):
-        return "CommandCall({0!r})".format(' '.join(self.command))
+        return "CommandCall({0!r}, {1!r})".format(' '.join(self.command), self.parameter_keys)
 
 
 class PythonFunctionCall(Task):
@@ -189,15 +223,15 @@ class JobConfig(TaskArray):
 
     def __init__(self,
                  jobname="MyJob",
-                 requirements={},
-                 options={},
+                 requirements=None,
+                 options=None,
                  script_template="run.sh",
                  config_filename_template="{jobname}.config.pkl",
                  script_filename_template="{jobname}.run.sh",
                  **kwargs):
         self.jobname = jobname
-        self.requirements = requirements
-        self.options = options
+        self.requirements = requirements if requirements is not None else {}
+        self.options = options if options is not None else {}
         self.script_template = script_template
         self.config_filename_template = config_filename_template
         self.script_filename_template = script_filename_template
@@ -337,7 +371,6 @@ class SGEJob(JobConfig):
 
 
 class SlurmJob(JobConfig):
-    """Submit the different tasks as parallel slurm jobs (as a task array)."""
     def __init__(self, requirements_slurm={}, **kwargs):
         self.requirements_slurm = requirements_slurm
         kwargs.setdefault('script_template', "slurm.sh")
