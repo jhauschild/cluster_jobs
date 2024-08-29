@@ -2,7 +2,7 @@
 
 # hardware requirements
 #SBATCH --time=00:10:00                    # enter a maximum runtime for the job. (format: DD-HH:MM:SS, or just HH:MM:SS)
-#SBATCH --cpus-per-task=4                  # use multi-threading with 4 cpu threads (= 2 physical cores + hyperthreading)
+#SBATCH --cpus-per-task=4                  # use multi-threading with 4 cpu threads (= 2 physical cores * hyperthreading)
 #SBATCH --mem=1G                           # request this amount of memory (total per node)
 
 # you need the following settings for students jobs
@@ -25,8 +25,8 @@
 
 set -e  # abort the whole script if one command fails
 
-export OMP_NUM_THREADS=$SLURM_CPUS_PER_TASK  # number of CPUs per node, total for all the tasks below.
 # see `man sbatch` for further possible environment variables you can use
+export OMP_NUM_THREADS=$SLURM_CPUS_ON_NODE  # number of CPUs per node, total for all the tasks below.
 
 # if needed, you can set/adjust PATH,PYTHONPATH etc to include other libraries
 # source /mount/packs/ml-2023/bin/activate

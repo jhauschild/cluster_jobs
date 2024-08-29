@@ -18,17 +18,25 @@ set -e  # abort whole script if any command fails
 # conda activate tenpy
 {environment_setup}
 
+# use SLURM_CPUS_PER_TASK, if not set default to SLURM_CPUS_ON_NODE
+USE_NUM_THREADS=${{SLURM_CPUS_PER_TASK:-${{SLURM_CPUS_ON_NODE}}}}
+if [ -z "$USE_NUM_THREADS" ]
+then
+	USE_NUM_THREADS="$(nproc --all)"
+	echo "WARNING: SLURM_CPUS_ON_NODE not set! Using all cores on machine, NTHREADS=$USE_NUM_THREADS"
+fi
 # When requesting --cpus-per-task 32 on nodes with CPU hyperthreading,
-# slurm will allocate the job 32 threads = 16 cores x 2 threads per core.
-# For numerical applications, e.g MKL functions like BLAS/LAPACK functions, it is better to ignore
-# hyperthreading and rather set NUM_THREADS to the number of physical cores.
+# slurm will allocate the job 32 threads = 16 physical cores x 2 (hyper)threads per core.
+# For many numerical applications, e.g BLAS/LAPACK functions like matrix diagonalization, 
+# it is better to ignore hyperthreading and rather set NUM_THREADS to the number of physical cores.
 # Hence we divide by 2 here:
-export OMP_NUM_THREADS=$(($SLURM_CPUS_PER_TASK / 2 ))  # number of CPUs per node, total for all the tasks below.
+USE_NUM_THREADS=$(($USE_NUM_THREADS / 2 ))
+export OMP_NUM_THREADS=$USE_NUM_THREADS  # number of CPUs per node, total for all the tasks below.
 export MKL_DYNAMIC=FALSE
-export MKL_NUM_THREADS=$(( $SLURM_CPUS_PER_TASK / 2 ))  # number of CPUs per node, total for all the tasks below.
-export NUMBA_NUM_THREADS=$(( $SLURM_CPUS_PER_TASK / 2))
+export MKL_NUM_THREADS=$USE_NUM_THREADS  # number of CPUs per node, total for all the tasks below.
+export NUMBA_NUM_THREADS=$USE_NUM_THREADS
 
-echo "Running task {task_id} specified in {config_file} on $HOSTNAME at $(date)"
+echo "Running task {task_id} specified in {config_file} on $HOSTNAME at $(date) with $USE_NUM_THREADS threads"
 python {cluster_jobs_module} run {config_file} {task_id}
 # if you want to redirect output to file, you can append the following to the line above:
 #     &> "{jobname}.task_{task_id}.out"

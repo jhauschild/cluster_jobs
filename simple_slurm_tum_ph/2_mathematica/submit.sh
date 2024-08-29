@@ -2,8 +2,8 @@
 
 # hardware requirements
 #SBATCH --time=00:10:00                    # enter a maximum runtime for the job. (format: DD-HH:MM:SS, or just HH:MM:SS)
-# note: you need to read out the $SLURM_CPUS_PER_TASK in the mathematica script to make use of the parallelization!
-#SBATCH --cpus-per-task=4                  # use multi-threading with 4 cpu threads (= 2 physical cores + hyperthreading)
+# note: you need to read out the $SLURM_CPUS_ON_NODE or $SLURM_CPUS_PER_TASK in the mathematica script to make use of the parallelization!
+#SBATCH --cpus-per-task=4                  # use multi-threading with 4 cpu threads (= 2 physical cores * hyperthreading)
 #SBATCH --mem=5G                           # request this amount of memory (total per node)
 
 #SBATCH --partition=cpu                    # optional, cpu is default. needed for gpu/classes. See `sinfo` for options
@@ -24,7 +24,7 @@ set -e  # abort the whole script if one command fails
 # to select a sepcific mathematica version, uncomment:
 export PATH="/mount/packs/Mathematica13.2/:$PATH"
 
-echo "starting job on $(hostname) at $(date) with $SLURM_CPUS_PER_TASK cores"
+echo "starting job on $(hostname) at $(date) with $SLURM_CPUS_ON_NODE cores"
 # example matematica script
 wolfram -script ./simulation.wsl
 echo "finished job at $(date)"
