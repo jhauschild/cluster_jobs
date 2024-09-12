@@ -25,12 +25,6 @@ then
 	USE_NUM_THREADS="$(nproc --all)"
 	echo "WARNING: SLURM_CPUS_ON_NODE not set! Using all cores on machine, NTHREADS=$USE_NUM_THREADS"
 fi
-# When requesting --cpus-per-task 32 on nodes with CPU hyperthreading,
-# slurm will allocate the job 32 threads = 16 physical cores x 2 (hyper)threads per core.
-# For many numerical applications, e.g BLAS/LAPACK functions like matrix diagonalization, 
-# it is better to ignore hyperthreading and rather set NUM_THREADS to the number of physical cores.
-# Hence we divide by 2 here:
-USE_NUM_THREADS=$(($USE_NUM_THREADS / 2 ))
 export OMP_NUM_THREADS=$USE_NUM_THREADS  # number of CPUs per node, total for all the tasks below.
 export MKL_DYNAMIC=FALSE
 export MKL_NUM_THREADS=$USE_NUM_THREADS  # number of CPUs per node, total for all the tasks below.
