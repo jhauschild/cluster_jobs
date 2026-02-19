@@ -6,6 +6,8 @@
 #SBATCH --cpus-per-task=4                  # use multi-threading with 4 cpu threads (= 2 physical cores * hyperthreading)
 #SBATCH --mem=5G                           # request this amount of memory (total per node)
 
+#SBATCH --license Mathematica:1            # adjust the number to the licenses you require (i.e. the number of subkernels/cores!)
+
 #SBATCH --partition=cpu                    # optional, cpu is default. needed for gpu/classes. See `sinfo` for options
 #SBATCH --qos=debug                        # Submit debug job for quick test. See `sacctmgr show qos` for options
 

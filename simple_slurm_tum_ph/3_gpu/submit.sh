@@ -3,13 +3,14 @@
 # hardware requirements
 #SBATCH --time=00:10:00                    # enter a maximum runtime for the job. (format: DD-HH:MM:SS, or just HH:MM:SS)
 #SBATCH --cpus-per-task=4                  # use multi-threading with 4 cpu threads (= 2 physical cores * hyperthreading)
-#SBATCH --mem=1G                           # request this amount of memory (total per node)
+#SBATCH --mem=1G                           # request this amount of (CPU) memory (total per node)
 
-# you need the following settings for students jobs
+# you need the following settings for GPU jobs
 #SBATCH --partition=gpu                    # on the gpu partition
 #SBATCH --qos=gpu                          # with the gpu (or debug) qos
-#SBATCH --gpus=1                           # request the gpu
-#SBATCH --account=gpu_manual               # with a non-default account (limited access!)
+#SBATCH --gpus=1                           # request the gpu. Specific type:count with --gpus=h200_140g:2
+                                           # check `sacctmgr show tres` to see available GPU types
+#SBATCH --account=gpu_pollmann             # with a non-default account, check with `slurm_account_check`
 #SBATCH --reservation=gpu                  # using the cpu/ram set aside for the GPU calculations
 
 
