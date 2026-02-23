@@ -11,7 +11,6 @@
 #SBATCH --gpus=1                           # request the gpu. Specific type:count with --gpus=h200_140g:2
                                            # check `sacctmgr show tres` to see available GPU types
 #SBATCH --account=gpu_pollmann             # with a non-default account, check with `slurm_account_check`
-#SBATCH --reservation=gpu                  # using the cpu/ram set aside for the GPU calculations
 
 
 # some further useful options, uncomment as needed/desired
