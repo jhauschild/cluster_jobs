@@ -5,7 +5,7 @@
 #SBATCH --nodes=2                          # on this number of nodes
 #SBATCH --ntasks-per-node=3                # request this many MPI tasks per node
 #SBATCH --cpus-per-task=4                  # each task using (OMP) multi-threading with this many cpu threads (= 2 physical cores * hyperthreading)
-#SBATCH --mem-per-task=100M                # request this amount of memory for each MPI task
+#SBATCH --mem=16G                          # request this amount of memory total per node
 
 #SBATCH --partition=cpu_mpi_intel          # or cpu_mpi_amd
 #SBATCH --qos=normal                       # Submit normal job. See `sacctmgr show qos` for options
